@@ -39,7 +39,7 @@ export default function AppSidebar({ onNewChat }: AppSidebarProps) {
     .slice(0, 2);
 
   return (
-    <Sidebar>
+    <Sidebar className="border-r border-sidebar-border">
       <SidebarHeader className="border-b p-4">
         <div className="flex items-center gap-2 font-semibold text-lg">
           <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600">

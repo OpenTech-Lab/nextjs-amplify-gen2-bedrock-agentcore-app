@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
+import { fetchAuthSession } from "aws-amplify/auth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -50,7 +51,17 @@ export default function ChatComponent() {
     const currentInput = input;
     setInput("");
 
-    await sendMessage({ text: currentInput });
+    try {
+      const session = await fetchAuthSession();
+      const token = session.tokens?.accessToken?.toString();
+      await sendMessage(
+        { text: currentInput },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    } catch (error) {
+      console.error("Error fetching auth session:", error);
+      await sendMessage({ text: currentInput });
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -61,9 +72,9 @@ export default function ChatComponent() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full flex-1 bg-background">
       {/* Header with Trigger */}
-      <header className="flex items-center px-4 py-3 space-x-2 bg-background/30 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="flex items-center px-4 py-3 space-x-2 bg-background/30 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center gap-3">
           <SidebarTrigger />
           <div className="flex items-center gap-2">
@@ -91,7 +102,7 @@ export default function ChatComponent() {
             </div>
           )}
         </Badge>
-      </header>
+      </div>
 
       {/* Messages Area */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
