@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@aws-amplify/ui-react": "^6.5.5",
+    "@aws-amplify/platform-core": "^1.10.3",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
