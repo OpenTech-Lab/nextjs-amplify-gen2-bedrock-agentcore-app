@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useSSEChat } from "@/hooks/useSSEChat";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -14,23 +15,34 @@ import remarkGfm from "remark-gfm";
 
 export default function ChatComponent() {
   const [input, setInput] = useState("");
-  const [allMessages, setAllMessages] = useState<
-    Array<{ type: "user" | "ai"; content: string }>
-  >([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { messages, isLoading, error, sendMessage } = useSSEChat({
-    maxRetries: 3,
-    retryDelay: 1000,
+  const { messages, sendMessage, status, error } = useChat({
+    transport: new DefaultChatTransport({
+      api: "/api/invocations",
+      body: {
+        model: "anthropic.claude-3-5-sonnet-20240620-v1:0",
+      },
+    }),
   });
+
+  const isLoading = status === "submitted" || status === "streaming";
+
+  // Helper function to get text content from message parts
+  const getMessageText = (message: (typeof messages)[0]) => {
+    return message.parts
+      .filter((part) => part.type === "text")
+      .map((part) => (part as { text: string }).text)
+      .join("");
+  };
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [allMessages, isLoading]);
+  }, [messages, isLoading]);
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -38,40 +50,8 @@ export default function ChatComponent() {
     const currentInput = input;
     setInput("");
 
-    // ユーザーメッセージを追加
-    setAllMessages((prev) => [
-      ...prev,
-      { type: "user", content: currentInput },
-    ]);
-
-    // AIレスポンスを取得
-    await sendMessage(currentInput);
-
-    // Focus back to textarea after sending
-    textareaRef.current?.focus();
+    await sendMessage({ text: currentInput });
   };
-
-  // useSSEChatのmessages配列の変化を監視してallMessagesに反映
-  useEffect(() => {
-    if (messages.length > 0) {
-      const latestMessage = messages[messages.length - 1];
-
-      queueMicrotask(() => {
-        setAllMessages((prev) => {
-          const lastMessage = prev[prev.length - 1];
-
-          if (lastMessage && lastMessage.type === "ai") {
-            return [
-              ...prev.slice(0, -1),
-              { type: "ai" as const, content: latestMessage },
-            ];
-          } else {
-            return [...prev, { type: "ai" as const, content: latestMessage }];
-          }
-        });
-      });
-    }
-  }, [messages]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -116,7 +96,7 @@ export default function ChatComponent() {
       {/* Messages Area */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
-          {allMessages.length === 0 ? (
+          {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center">
               <div className="p-4 rounded-full bg-gradient-to-br from-blue-50 to-purple-50 mb-4">
                 <Bot className="w-12 h-12 text-blue-500" />
@@ -130,23 +110,23 @@ export default function ChatComponent() {
             </div>
           ) : (
             <div className="space-y-6">
-              {allMessages.map((message, index) => (
+              {messages.map((message, index) => (
                 <div
-                  key={index}
+                  key={message.id}
                   className={`flex gap-3 sm:gap-4 ${
-                    message.type === "user" ? "flex-row-reverse" : "flex-row"
+                    message.role === "user" ? "flex-row-reverse" : "flex-row"
                   } animate-in fade-in slide-in-from-bottom-2 duration-300`}
                 >
                   {/* Avatar */}
                   <Avatar
                     className={`flex-shrink-0 w-8 h-8 ${
-                      message.type === "user"
+                      message.role === "user"
                         ? "bg-gradient-to-br from-blue-500 to-blue-600"
                         : "bg-gradient-to-br from-purple-500 to-purple-600"
                     }`}
                   >
                     <AvatarFallback className="bg-transparent text-white">
-                      {message.type === "user" ? (
+                      {message.role === "user" ? (
                         <User className="w-4 h-4" />
                       ) : (
                         <Bot className="w-4 h-4" />
@@ -157,15 +137,15 @@ export default function ChatComponent() {
                   {/* Message Content */}
                   <div
                     className={`flex-1 ${
-                      message.type === "user" ? "text-right" : "text-left"
+                      message.role === "user" ? "text-right" : "text-left"
                     }`}
                   >
                     <div className="text-xs font-medium text-muted-foreground mb-1.5">
-                      {message.type === "user" ? "あなた" : "AI アシスタント"}
+                      {message.role === "user" ? "あなた" : "AI アシスタント"}
                     </div>
                     <div
                       className={`inline-block max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 ${
-                        message.type === "user"
+                        message.role === "user"
                           ? "bg-gradient-to-br from-blue-100 to-blue-50 text-white"
                           : "bg-muted/50 text-foreground border border-border/50"
                       }`}
@@ -181,7 +161,7 @@ export default function ChatComponent() {
                               return isInline ? (
                                 <code
                                   className={`${
-                                    message.type === "user"
+                                    message.role === "user"
                                       ? "bg-blue-700/50"
                                       : "bg-muted"
                                   } rounded px-1.5 py-0.5 text-sm font-mono`}
@@ -192,7 +172,7 @@ export default function ChatComponent() {
                               ) : (
                                 <pre
                                   className={`${
-                                    message.type === "user"
+                                    message.role === "user"
                                       ? "bg-blue-700/50"
                                       : "bg-muted"
                                   } rounded-lg p-3 overflow-x-auto my-2`}
@@ -207,7 +187,7 @@ export default function ChatComponent() {
                             a: ({ children, ...props }: any) => (
                               <a
                                 className={`${
-                                  message.type === "user"
+                                  message.role === "user"
                                     ? "text-blue-100 hover:text-white"
                                     : "text-blue-600 hover:text-blue-800"
                                 } underline`}
@@ -246,7 +226,7 @@ export default function ChatComponent() {
                             blockquote: ({ children, ...props }: any) => (
                               <blockquote
                                 className={`border-l-4 ${
-                                  message.type === "user"
+                                  message.role === "user"
                                     ? "border-blue-300"
                                     : "border-muted-foreground"
                                 } pl-4 italic my-2`}
@@ -257,11 +237,11 @@ export default function ChatComponent() {
                             ),
                           }}
                         >
-                          {message.content}
+                          {getMessageText(message)}
                         </ReactMarkdown>
                         {isLoading &&
-                          message.type === "ai" &&
-                          index === allMessages.length - 1 && (
+                          message.role === "assistant" &&
+                          index === messages.length - 1 && (
                             <span className="inline-block w-1.5 h-5 ml-1 bg-current animate-pulse" />
                           )}
                       </div>
@@ -278,7 +258,7 @@ export default function ChatComponent() {
                     <div className="inline-block max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 bg-destructive/10 border border-destructive/20">
                       <div className="flex items-center gap-2 text-sm text-destructive">
                         <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                        <span>{error}</span>
+                        <span>{error.message}</span>
                       </div>
                     </div>
                   </div>

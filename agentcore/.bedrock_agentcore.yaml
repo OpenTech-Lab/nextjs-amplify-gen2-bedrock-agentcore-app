@@ -1,4 +1,4 @@
-default_agent: mcp_agent
+default_agent: mcp_agent_gen2
 agents:
   mcp_agent:
     name: mcp_agent
@@ -49,5 +49,55 @@ agents:
         allowedClients:
         - 3faqnmvor5smg5pht2d4ogl5pv
         - 5jds7t38fnstk495kvmea444gu
+    request_header_configuration: null
+    oauth_configuration: null
+  mcp_agent_gen2:
+    name: mcp_agent_gen2
+    entrypoint: /home/toyofumi/Project/nextjs-amplify-gen2-bedrock-agentcore-app/agentcore/mcp_agent_gen2.py
+    deployment_type: direct_code_deploy
+    runtime_type: PYTHON_3_13
+    platform: linux/arm64
+    container_runtime: null
+    source_path: /home/toyofumi/Project/nextjs-amplify-gen2-bedrock-agentcore-app/agentcore
+    aws:
+      execution_role: arn:aws:iam::832780067678:role/AmazonBedrockAgentCoreSDKRuntime-ap-northeast-1-ab8ab1dc0a
+      execution_role_auto_create: false
+      account: '832780067678'
+      region: ap-northeast-1
+      ecr_repository: null
+      ecr_auto_create: false
+      s3_path: s3://bedrock-agentcore-codebuild-sources-832780067678-ap-northeast-1
+      s3_auto_create: false
+      network_configuration:
+        network_mode: PUBLIC
+        network_mode_config: null
+      protocol_configuration:
+        server_protocol: HTTP
+      observability:
+        enabled: true
+      lifecycle_configuration:
+        idle_runtime_session_timeout: null
+        max_lifetime: null
+    bedrock_agentcore:
+      agent_id: mcp_agent_gen2-mbDZM6Dy7u
+      agent_arn: arn:aws:bedrock-agentcore:ap-northeast-1:832780067678:runtime/mcp_agent_gen2-mbDZM6Dy7u
+      agent_session_id: null
+    codebuild:
+      project_name: null
+      execution_role: null
+      source_bucket: null
+    memory:
+      mode: STM_ONLY
+      memory_id: mcp_agent_gen2_mem-EGb5so7QoY
+      memory_arn: arn:aws:bedrock-agentcore:ap-northeast-1:832780067678:memory/mcp_agent_gen2_mem-EGb5so7QoY
+      memory_name: mcp_agent_gen2_mem
+      event_expiry_days: 30
+      first_invoke_memory_check_done: true
+      was_created_by_toolkit: true
+    authorizer_configuration:
+      customJWTAuthorizer:
+        discoveryUrl: https://cognito-idp.ap-northeast-1.amazonaws.com/ap-northeast-1_0wU0wAyRD/.well-known/openid-configuration
+        allowedClients:
+        - 3j65bomu8qb217padobevhbq50
     request_header_configuration: null
     oauth_configuration: null
