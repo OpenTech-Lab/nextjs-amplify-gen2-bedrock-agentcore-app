@@ -1,0 +1,53 @@
+default_agent: mcp_agent
+agents:
+  mcp_agent:
+    name: mcp_agent
+    entrypoint: /home/toyofumi/Project/nextjs-amplify-gen1-bedrock-agentcore-app/agentcore/mcp_agent.py
+    deployment_type: container
+    runtime_type: null
+    platform: linux/arm64
+    container_runtime: docker
+    source_path: /home/toyofumi/Project/nextjs-amplify-gen1-bedrock-agentcore-app/agentcore
+    aws:
+      execution_role: arn:aws:iam::832780067678:role/AmazonBedrockAgentCoreSDKRuntime-ap-northeast-1-15546741b7
+      execution_role_auto_create: false
+      account: '832780067678'
+      region: ap-northeast-1
+      ecr_repository: 832780067678.dkr.ecr.ap-northeast-1.amazonaws.com/bedrock-agentcore-mcp_agent
+      ecr_auto_create: false
+      s3_path: null
+      s3_auto_create: false
+      network_configuration:
+        network_mode: PUBLIC
+        network_mode_config: null
+      protocol_configuration:
+        server_protocol: HTTP
+      observability:
+        enabled: true
+      lifecycle_configuration:
+        idle_runtime_session_timeout: null
+        max_lifetime: null
+    bedrock_agentcore:
+      agent_id: mcp_agent-D4IDD3BLGz
+      agent_arn: arn:aws:bedrock-agentcore:ap-northeast-1:832780067678:runtime/mcp_agent-D4IDD3BLGz
+      agent_session_id: null
+    codebuild:
+      project_name: bedrock-agentcore-mcp_agent-builder
+      execution_role: arn:aws:iam::832780067678:role/AmazonBedrockAgentCoreSDKCodeBuild-ap-northeast-1-15546741b7
+      source_bucket: bedrock-agentcore-codebuild-sources-832780067678-ap-northeast-1
+    memory:
+      mode: STM_AND_LTM
+      memory_id: my_agent_mem-S18JfcBQcc
+      memory_arn: null
+      memory_name: mcp_agent_memory
+      event_expiry_days: 30
+      first_invoke_memory_check_done: false
+      was_created_by_toolkit: false
+    authorizer_configuration:
+      customJWTAuthorizer:
+        discoveryUrl: https://cognito-idp.ap-northeast-1.amazonaws.com/ap-northeast-1_A7Y7qA18g/.well-known/openid-configuration
+        allowedClients:
+        - 3faqnmvor5smg5pht2d4ogl5pv
+        - 5jds7t38fnstk495kvmea444gu
+    request_header_configuration: null
+    oauth_configuration: null

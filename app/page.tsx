@@ -1,52 +1,60 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { generateClient } from "aws-amplify/data";
-import type { Schema } from "@/amplify/data/resource";
-import "./../app/app.css";
-import { Amplify } from "aws-amplify";
-import outputs from "@/amplify_outputs.json";
-import "@aws-amplify/ui-react/styles.css";
+import { useState, useCallback } from "react";
+import dynamic from "next/dynamic";
+import { useAuthenticator } from "@aws-amplify/ui-react";
+import { Sparkles, Loader2 } from "lucide-react";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 
-Amplify.configure(outputs);
+// Dynamic import to avoid SSR issues
+const AppSidebar = dynamic(() => import("@/components/Sidebar"), {
+  ssr: false,
+});
+const ChatComponent = dynamic(() => import("@/components/ChatComponent"), {
+  ssr: false,
+});
 
-const client = generateClient<Schema>();
+export default function Home() {
+  const { user } = useAuthenticator();
+  const [chatKey, setChatKey] = useState(0);
 
-export default function App() {
-  const [todos, setTodos] = useState<Array<Schema["Todo"]["type"]>>([]);
-
-  function listTodos() {
-    client.models.Todo.observeQuery().subscribe({
-      next: (data) => setTodos([...data.items]),
-    });
-  }
-
-  useEffect(() => {
-    listTodos();
+  const handleNewChat = useCallback(() => {
+    setChatKey((prev) => prev + 1);
   }, []);
 
-  function createTodo() {
-    client.models.Todo.create({
-      content: window.prompt("Todo content"),
-    });
+  // 認証済みの場合はチャット画面を表示
+  if (user) {
+    return (
+      <SidebarProvider>
+        <AppSidebar onNewChat={handleNewChat} />
+        <SidebarInset className="h-screen overflow-hidden">
+          <ChatComponent key={chatKey} />
+        </SidebarInset>
+      </SidebarProvider>
+    );
   }
 
+  // 未認証の場合はウェルカム画面を表示
+  // （AuthProviderが自動的に認証画面を表示）
   return (
-    <main>
-      <h1>My todos</h1>
-      <button onClick={createTodo}>+ new</button>
-      <ul>
-        {todos.map((todo) => (
-          <li key={todo.id}>{todo.content}</li>
-        ))}
-      </ul>
-      <div>
-        🥳 App successfully hosted. Try creating a new todo.
-        <br />
-        <a href="https://docs.amplify.aws/nextjs/start/quickstart/nextjs-app-router-client-components/">
-          Review next steps of this tutorial.
-        </a>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+      <div className="text-center max-w-md">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 mb-6 shadow-lg">
+          <Sparkles className="w-8 h-8 text-white" />
+        </div>
+        <h1 className="text-3xl sm:text-4xl font-bold mb-3">
+          <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Knowledge Share
+          </span>
+        </h1>
+        <p className="text-muted-foreground mb-8 text-sm sm:text-base">
+          ログインしてAIアシスタントとの会話を始めましょう
+        </p>
+        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+          <span>認証中...</span>
+        </div>
       </div>
-    </main>
+    </div>
   );
 }
