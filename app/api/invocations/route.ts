@@ -1,18 +1,13 @@
-import { UIMessage } from "ai";
+import { createAmazonBedrock } from "@ai-sdk/amazon-bedrock";
+import { fromNodeProviderChain } from "@aws-sdk/credential-providers";
+import { convertToModelMessages, streamText, UIMessage } from "ai";
 
-export const maxDuration = 60;
+export const maxDuration = 30;
 
-function buildApiUrl() {
-  if (process.env.NEXT_PUBLIC_AGENT_ARN) {
-    const agentArn = process.env.NEXT_PUBLIC_AGENT_ARN!;
-    const region = process.env.NEXT_PUBLIC_AWS_REGION!;
-    const escapedArn = encodeURIComponent(agentArn);
-    const qualifier = process.env.NEXT_PUBLIC_QUALIFIER;
-    return `https://bedrock-agentcore.${region}.amazonaws.com/runtimes/${escapedArn}/invocations?qualifier=${qualifier}`;
-  } else {
-    return "/api/invocations";
-  }
-}
+const bedrock = createAmazonBedrock({
+  region: "ap-northeast-1",
+  credentialProvider: fromNodeProviderChain(),
+});
 
 export async function POST(req: Request) {
   const {
@@ -23,36 +18,18 @@ export async function POST(req: Request) {
     model: string;
   } = await req.json();
 
-  const authHeader = req.headers.get("Authorization");
-  const apiUrl = buildApiUrl();
-  console.log("Forwarding request to:", apiUrl);
+  const result = streamText({
+    model: bedrock(model),
+    messages: await convertToModelMessages(messages),
+    system: `
+      あなたは知識を提供するためにユーザーを支援するアシスタントです。
+      主な役割は、ユーザーが提供する情報に基づいて適切な情報を収集し回答することです。
+      回答は簡潔に、関連する情報のみを提供してください。
+      `,
+  });
 
-  try {
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(authHeader ? { Authorization: authHeader } : {}),
-      },
-      body: JSON.stringify({ messages, model }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Agentcore API error:", response.status, errorText);
-      return new Response(errorText, { status: response.status });
-    }
-
-    return new Response(response.body, {
-      headers: {
-        "Content-Type": response.headers.get("Content-Type") || "text/plain",
-      },
-    });
-  } catch (error) {
-    console.error("Error forwarding request:", error);
-    return new Response(JSON.stringify({ error: "Internal Server Error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
+  return result.toUIMessageStreamResponse({
+    sendSources: true,
+    sendReasoning: true,
+  });
 }

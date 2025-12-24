@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { useSSEChat } from "@/hooks/useSSEChat";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,30 +12,14 @@ import { Send, User, Bot, AlertCircle } from "lucide-react";
 import { Badge } from "./ui/badge";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { v4 as uuidv4 } from "uuid";
 
 export default function ChatComponent() {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { messages, sendMessage, status, error } = useChat({
-    transport: new DefaultChatTransport({
-      api: "/api/invocations",
-      body: {
-        model: "anthropic.claude-3-5-sonnet-20240620-v1:0",
-      },
-    }),
-  });
-
-  const isLoading = status === "submitted" || status === "streaming";
-
-  // Helper function to get text content from message parts
-  const getMessageText = (message: (typeof messages)[0]) => {
-    return message.parts
-      .filter((part) => part.type === "text")
-      .map((part) => (part as { text: string }).text)
-      .join("");
-  };
+  const { messages, sendMessage, isLoading, error } = useSSEChat();
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -51,17 +34,7 @@ export default function ChatComponent() {
     const currentInput = input;
     setInput("");
 
-    try {
-      const session = await fetchAuthSession();
-      const token = session.tokens?.accessToken?.toString();
-      await sendMessage(
-        { text: currentInput },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-    } catch (error) {
-      console.error("Error fetching auth session:", error);
-      await sendMessage({ text: currentInput });
-    }
+    await sendMessage(currentInput);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -123,7 +96,7 @@ export default function ChatComponent() {
             <div className="space-y-6">
               {messages.map((message, index) => (
                 <div
-                  key={message.id}
+                  key={index}
                   className={`flex gap-3 sm:gap-4 ${
                     message.role === "user" ? "flex-row-reverse" : "flex-row"
                   } animate-in fade-in slide-in-from-bottom-2 duration-300`}
@@ -248,7 +221,7 @@ export default function ChatComponent() {
                             ),
                           }}
                         >
-                          {getMessageText(message)}
+                          {message.content}
                         </ReactMarkdown>
                         {isLoading &&
                           message.role === "assistant" &&
@@ -269,7 +242,7 @@ export default function ChatComponent() {
                     <div className="inline-block max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 bg-destructive/10 border border-destructive/20">
                       <div className="flex items-center gap-2 text-sm text-destructive">
                         <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                        <span>{error.message}</span>
+                        <span>{error}</span>
                       </div>
                     </div>
                   </div>

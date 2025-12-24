@@ -14,6 +14,13 @@ Oauth: https://cognito-idp.us-east-1.amazonaws.com/us-east-1_xxxxxx/.well-known/
   agentcore launch
 ```
 
+## test
+
+```
+agentcore status
+agentcore invoke '{"prompt": "Hello"}'
+```
+
 ```
 agentcore launch --local
 agentcore invoke --local '{"prompt": "Hello"}'
