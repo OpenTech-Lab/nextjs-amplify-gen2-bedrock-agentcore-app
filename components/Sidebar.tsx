@@ -25,6 +25,7 @@ import {
   Sparkles,
   PlusCircle,
   MessageSquare,
+  Trash2,
 } from "lucide-react";
 
 interface AppSidebarProps {
@@ -40,7 +41,43 @@ export default function AppSidebar({ onNewChat, onSelectSession, currentSessionI
   const { setOpenMobile } = useSidebar();
   const [sessions, setSessions] = useState<Array<Schema["ChatSession"]["type"]>>([]);
 
+  const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!confirm("この会話を削除してもよろしいですか？")) return;
+    
+    try {
+      // Delete all messages in this session
+      const { data: messages } = await client.models.Message.list({
+        filter: { sessionId: { eq: sessionId } }
+      });
+      
+      for (const msg of messages) {
+        await client.models.Message.delete({ id: msg.id });
+      }
+      
+      // Delete the session
+      const { data: sessionsToDelete } = await client.models.ChatSession.list({
+        filter: { sessionId: { eq: sessionId } }
+      });
+      
+      for (const sess of sessionsToDelete) {
+        await client.models.ChatSession.delete({ id: sess.id });
+      }
+      
+      // If currently viewing this session, trigger new chat
+      if (currentSessionId === sessionId) {
+        onNewChat();
+      }
+    } catch (error) {
+      console.error("Failed to delete session:", error);
+      alert("削除に失敗しました");
+    }
+  };
+
   useEffect(() => {
+    if (!user) return;
+    
     // Subscribe to session updates
     const sub = client.models.ChatSession.observeQuery().subscribe({
         next: ({ items }) => {
@@ -55,7 +92,7 @@ export default function AppSidebar({ onNewChat, onSelectSession, currentSessionI
         }
     });
     return () => sub.unsubscribe();
-  }, []);
+  }, [user]);
 
   const username = user?.signInDetails?.loginId || user?.username || "User";
   const initials = username
@@ -99,17 +136,27 @@ export default function AppSidebar({ onNewChat, onSelectSession, currentSessionI
             <SidebarMenu>
               {sessions.map((session) => (
                 <SidebarMenuItem key={session.id}>
-                  <SidebarMenuButton
-                    onClick={() => {
-                        onSelectSession(session.sessionId);
-                        setOpenMobile(false);
-                    }}
-                    isActive={currentSessionId === session.sessionId}
-                    className="truncate"
-                  >
-                    <MessageSquare className="w-4 h-4 shrink-0" />
-                    <span className="truncate">{session.name || "Untitled"}</span>
-                  </SidebarMenuButton>
+                  <div className="flex items-center gap-1 w-full group">
+                    <SidebarMenuButton
+                      onClick={() => {
+                          onSelectSession(session.sessionId);
+                          setOpenMobile(false);
+                      }}
+                      isActive={currentSessionId === session.sessionId}
+                      className="truncate flex-1"
+                    >
+                      <MessageSquare className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{session.name || "Untitled"}</span>
+                    </SidebarMenuButton>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      onClick={(e) => handleDeleteSession(session.sessionId, e)}
+                    >
+                      <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
+                    </Button>
+                  </div>
                 </SidebarMenuItem>
               ))}
               {sessions.length === 0 && (

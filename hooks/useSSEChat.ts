@@ -124,12 +124,14 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
       setIsLoading(true);
       setError(null);
 
-      // Add user message immediately
-      setMessages((prev) => [
-        ...prev,
-        { role: "user", content: prompt },
-        { role: "assistant", content: "" },
-      ]);
+      // Add user message immediately only on first attempt
+      if (retryCount === 0) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "user", content: prompt },
+          { role: "assistant", content: "" },
+        ]);
+      }
 
       let savedMessageId: string | undefined;
 
