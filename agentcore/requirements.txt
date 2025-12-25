@@ -2,3 +2,4 @@ bedrock-agentcore
 strands-agents
 mcp
 bedrock-agentcore-starter-toolkit
+awslabs.aws_documentation_mcp_server

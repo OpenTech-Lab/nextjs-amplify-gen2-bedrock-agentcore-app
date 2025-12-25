@@ -71,8 +71,8 @@ export function useSSEChat(options: SSEChatOptions = {}) {
 
       // 認証トークンを取得
       const session = await fetchAuthSession();
-      const credentials = session.credentials;
-      if (!credentials) {
+      const token = session.tokens?.accessToken?.toString();
+      if (!token) {
         setError("認証トークンが取得できません");
         setIsLoading(false);
         return;
@@ -82,8 +82,6 @@ export function useSSEChat(options: SSEChatOptions = {}) {
 
       try {
         const functionUrl = buildApiUrl();
-        const url = new URL(functionUrl);
-        const region = process.env.NEXT_PUBLIC_AWS_REGION || "us-east-1";
 
         const requestBody = {
           prompt,
@@ -91,45 +89,16 @@ export function useSSEChat(options: SSEChatOptions = {}) {
           reasoning: true,
         };
 
-        // Extract query parameters for signing
-        const query: Record<string, string> = {};
-        url.searchParams.forEach((value, key) => {
-          query[key] = value;
-        });
-
-        const request = new HttpRequest({
+        const response = await fetch(functionUrl, {
           method: "POST",
-          protocol: url.protocol,
-          hostname: url.hostname,
-          path: url.pathname,
-          query,
+          mode: "cors",
           headers: {
             "Content-Type": "application/json",
             Accept: "text/event-stream",
-            host: url.hostname,
+            Authorization: `Bearer ${token}`,
             "X-Amzn-Bedrock-AgentCore-Runtime-Session-Id": sessionId,
           },
           body: JSON.stringify(requestBody),
-        });
-
-        const signer = new SignatureV4({
-          credentials: {
-            accessKeyId: credentials.accessKeyId!,
-            secretAccessKey: credentials.secretAccessKey!,
-            sessionToken: credentials.sessionToken,
-          },
-          region,
-          service: "bedrock-agentcore",
-          sha256: Sha256,
-        });
-
-        const signedRequest = await signer.sign(request);
-
-        const response = await fetch(functionUrl, {
-          method: signedRequest.method,
-          mode: "cors",
-          headers: signedRequest.headers as HeadersInit,
-          body: signedRequest.body as string,
         });
 
         console.log("Response status:", response.status);
@@ -203,9 +172,12 @@ export function useSSEChat(options: SSEChatOptions = {}) {
                 if (parsed.text) {
                   setMessages((prev) => {
                     const newMessages = [...prev];
-                    const lastMessage = newMessages[newMessages.length - 1];
+                    const lastMessageIndex = newMessages.length - 1;
+                    const lastMessage = { ...newMessages[lastMessageIndex] };
+                    
                     if (lastMessage.role === "assistant") {
                       lastMessage.content += parsed.text;
+                      newMessages[lastMessageIndex] = lastMessage;
                     }
                     return newMessages;
                   });

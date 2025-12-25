@@ -10,7 +10,8 @@ MODEL_ID = "jp.anthropic.claude-sonnet-4-5-20250929-v1:0"
 stdio_mcp_client = MCPClient(
     lambda: stdio_client(
         StdioServerParameters(
-            command="uvx", args=["awslabs.aws-documentation-mcp-server@latest"]
+            command="python",
+            args=["-m", "awslabs.aws_documentation_mcp_server.server"],
         )
     )
 )
@@ -69,7 +70,13 @@ async def invoke(payload):
     agent_stream = current_agent.stream_async(user_prompt)
     async for event in agent_stream:
         if "event" in event:
-            yield event
+            # Extract text from contentBlockDelta events
+            # Structure: {'event': {'contentBlockDelta': {'delta': {'text': '...'}, ...}}}
+            event_data = event["event"]
+            if "contentBlockDelta" in event_data:
+                delta = event_data["contentBlockDelta"].get("delta", {})
+                if "text" in delta:
+                    yield {"text": delta["text"]}
 
 if __name__ == "__main__":
     try:

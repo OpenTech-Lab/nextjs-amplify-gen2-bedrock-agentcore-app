@@ -10,8 +10,9 @@ Oauth: https://cognito-idp.us-east-1.amazonaws.com/us-east-1_xxxxxx/.well-known/
 # agentcore launch --local
 
 ```
-  agentcore configure --entrypoint mcp_agent_gen2.py
-  agentcore launch
+agentcore configure --entrypoint mcp_agent_gen2.py
+agentcore launch
+agentcore destroy
 ```
 
 ## test
