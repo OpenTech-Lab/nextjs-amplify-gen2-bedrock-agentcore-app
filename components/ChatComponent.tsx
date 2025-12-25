@@ -8,18 +8,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Spinner } from "@/components/ui/spinner";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Send, User, Bot, AlertCircle } from "lucide-react";
+import { Send, User, Bot, AlertCircle, ThumbsUp, ThumbsDown } from "lucide-react";
 import { Badge } from "./ui/badge";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { v4 as uuidv4 } from "uuid";
 
-export default function ChatComponent() {
+interface ChatComponentProps {
+  sessionId: string;
+}
+
+export default function ChatComponent({ sessionId }: ChatComponentProps) {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { messages, sendMessage, isLoading, error } = useSSEChat();
+  const { messages, sendMessage, isLoading, error, submitFeedback } = useSSEChat(sessionId);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -229,6 +233,35 @@ export default function ChatComponent() {
                             <span className="inline-block w-1.5 h-5 ml-1 bg-current animate-pulse" />
                           )}
                       </div>
+                      {/* Feedback Buttons */}
+                      {message.role === "assistant" && message.id && (
+                        <div className="flex gap-1 mt-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`h-6 w-6 ${
+                              message.feedback === "good"
+                                ? "text-blue-500"
+                                : "text-muted-foreground hover:text-blue-500"
+                            }`}
+                            onClick={() => submitFeedback(message.id!, "good")}
+                          >
+                            <ThumbsUp className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`h-6 w-6 ${
+                              message.feedback === "bad"
+                                ? "text-red-500"
+                                : "text-muted-foreground hover:text-red-500"
+                            }`}
+                            onClick={() => submitFeedback(message.id!, "bad")}
+                          >
+                            <ThumbsDown className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

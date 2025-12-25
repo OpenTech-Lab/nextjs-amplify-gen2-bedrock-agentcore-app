@@ -7,11 +7,22 @@ specifies that any user authenticated via an API key can "create", "read",
 "update", and "delete" any "Todo" records.
 =========================================================================*/
 const schema = a.schema({
-  Todo: a
+  Message: a
     .model({
-      content: a.string(),
+      userMessage: a.string().required(),
+      aiResponse: a.string(),
+      feedback: a.string(),
+      sessionId: a.string(),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [allow.owner()])
+    .secondaryIndexes((index) => [index("sessionId")]),
+  ChatSession: a
+    .model({
+      name: a.string(),
+      sessionId: a.string().required(),
+    })
+    .authorization((allow) => [allow.owner()])
+    .secondaryIndexes((index) => [index("sessionId")]),
 });
 
 export type Schema = ClientSchema<typeof schema>;
@@ -19,10 +30,7 @@ export type Schema = ClientSchema<typeof schema>;
 export const data = defineData({
   schema,
   authorizationModes: {
-    defaultAuthorizationMode: "apiKey",
-    apiKeyAuthorizationMode: {
-      expiresInDays: 30,
-    },
+    defaultAuthorizationMode: "userPool",
   },
 });
 

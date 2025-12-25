@@ -14,7 +14,11 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  useSidebar,
 } from "@/components/ui/sidebar";
+import { generateClient } from "aws-amplify/data";
+import type { Schema } from "@/amplify/data/resource";
+import { useEffect, useState } from "react";
 import {
   LogOut,
   User,
@@ -24,11 +28,34 @@ import {
 } from "lucide-react";
 
 interface AppSidebarProps {
-  onNewChat?: () => void;
+  onNewChat: () => void;
+  onSelectSession: (sessionId: string) => void;
+  currentSessionId: string;
 }
 
-export default function AppSidebar({ onNewChat }: AppSidebarProps) {
+const client = generateClient<Schema>();
+
+export default function AppSidebar({ onNewChat, onSelectSession, currentSessionId }: AppSidebarProps) {
   const { user, signOut } = useAuthenticator();
+  const { setOpenMobile } = useSidebar();
+  const [sessions, setSessions] = useState<Array<Schema["ChatSession"]["type"]>>([]);
+
+  useEffect(() => {
+    // Subscribe to session updates
+    const sub = client.models.ChatSession.observeQuery().subscribe({
+        next: ({ items }) => {
+            // Sort by updatedAt descending (manually for now as observeQuery sort might be tricky with just updatedAt)
+            // Actually, we can assume create order or manual sort.
+            // Let's sort by createdAt desc if possible, or filtered.
+            // For now just reverse items or sort by updatedAt if available.
+            const sorted = [...items].sort((a, b) => 
+                new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+            );
+            setSessions(sorted);
+        }
+    });
+    return () => sub.unsubscribe();
+  }, []);
 
   const username = user?.signInDetails?.loginId || user?.username || "User";
   const initials = username
@@ -70,15 +97,26 @@ export default function AppSidebar({ onNewChat }: AppSidebarProps) {
           <SidebarGroupLabel>最近の会話</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  className="cursor-not-allowed opacity-50"
-                  disabled
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  <span>会話履歴（近日公開）</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {sessions.map((session) => (
+                <SidebarMenuItem key={session.id}>
+                  <SidebarMenuButton
+                    onClick={() => {
+                        onSelectSession(session.sessionId);
+                        setOpenMobile(false);
+                    }}
+                    isActive={currentSessionId === session.sessionId}
+                    className="truncate"
+                  >
+                    <MessageSquare className="w-4 h-4 shrink-0" />
+                    <span className="truncate">{session.name || "Untitled"}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+              {sessions.length === 0 && (
+                  <div className="px-4 py-2 text-xs text-muted-foreground">
+                      履歴はありません
+                  </div>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

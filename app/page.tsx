@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useAuthenticator } from "@aws-amplify/ui-react";
 import { Sparkles, Loader2 } from "lucide-react";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { v4 as uuidv4 } from "uuid";
 
 // Dynamic import to avoid SSR issues
 const AppSidebar = dynamic(() => import("@/components/Sidebar"), {
@@ -16,19 +17,45 @@ const ChatComponent = dynamic(() => import("@/components/ChatComponent"), {
 
 export default function Home() {
   const { user } = useAuthenticator();
-  const [chatKey, setChatKey] = useState(0);
+  // Manage current session ID
+  const [currentSessionId, setCurrentSessionId] = useState("");
+
+  // Initialize session ID on client side
+  useEffect(() => {
+    // Try to recover last session from localStorage or create new
+    const lastId = localStorage.getItem("lastActiveSessionId");
+    if (lastId) {
+        setCurrentSessionId(lastId);
+    } else {
+        const newId = uuidv4();
+        setCurrentSessionId(newId);
+        localStorage.setItem("lastActiveSessionId", newId);
+    }
+  }, []);
 
   const handleNewChat = useCallback(() => {
-    setChatKey((prev) => prev + 1);
+    const newId = uuidv4();
+    setCurrentSessionId(newId);
+    localStorage.setItem("lastActiveSessionId", newId);
+  }, []);
+  
+  const handleSelectSession = useCallback((sessionId: string) => {
+    setCurrentSessionId(sessionId);
+    localStorage.setItem("lastActiveSessionId", sessionId);
   }, []);
 
   // 認証済みの場合はチャット画面を表示
   if (user) {
     return (
       <SidebarProvider>
-        <AppSidebar onNewChat={handleNewChat} />
+        <AppSidebar 
+            onNewChat={handleNewChat} 
+            onSelectSession={handleSelectSession}
+            currentSessionId={currentSessionId}
+        />
         <SidebarInset className="h-screen overflow-hidden">
-          <ChatComponent key={chatKey} />
+          {/* Key on sessionId to force re-mount and reset chat state when switching */}
+          {currentSessionId && <ChatComponent key={currentSessionId} sessionId={currentSessionId} />}
         </SidebarInset>
       </SidebarProvider>
     );
