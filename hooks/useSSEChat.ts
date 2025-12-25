@@ -281,14 +281,16 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
 
                 // Append text chunks to the current message
                 if (parsed.text) {
+                  aiResponseAccumulator += parsed.text;
+                  
                   setMessages((prev) => {
                     const newMessages = [...prev];
                     const lastMessageIndex = newMessages.length - 1;
                     const lastMessage = { ...newMessages[lastMessageIndex] };
                     
                     if (lastMessage.role === "assistant") {
-                      lastMessage.content += parsed.text;
-                      aiResponseAccumulator += parsed.text;
+                      // Replace content with the full accumulated text to prevent duplication issues
+                      lastMessage.content = aiResponseAccumulator;
                       newMessages[lastMessageIndex] = lastMessage;
                     }
                     return newMessages;

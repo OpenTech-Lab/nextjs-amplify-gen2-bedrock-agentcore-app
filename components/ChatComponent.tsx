@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Spinner } from "@/components/ui/spinner";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Send, User, Bot, AlertCircle, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Send, User, Bot, AlertCircle, ThumbsUp, ThumbsDown, Copy, Check } from "lucide-react";
 import { Badge } from "./ui/badge";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -20,6 +20,7 @@ interface ChatComponentProps {
 
 export default function ChatComponent({ sessionId }: ChatComponentProps) {
   const [input, setInput] = useState("");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -45,6 +46,16 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+    }
+  };
+
+  const copyToClipboard = async (text: string, messageId: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(messageId);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
     }
   };
 
@@ -233,32 +244,50 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
                             <span className="inline-block w-1.5 h-5 ml-1 bg-current animate-pulse" />
                           )}
                       </div>
-                      {/* Feedback Buttons */}
-                      {message.role === "assistant" && message.id && (
-                        <div className="flex gap-1 mt-1">
+                      {/* Control Panel (Feedback & Actions) */}
+                      {message.role === "assistant" && 
+                       message.id && 
+                       !(isLoading && index === messages.length - 1) && (
+                        <div className="flex items-center gap-1 mt-2 p-1 rounded-lg bg-muted/30 w-fit">
                           <Button
                             variant="ghost"
                             size="icon"
-                            className={`h-6 w-6 ${
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            onClick={() => copyToClipboard(message.content, message.id!)}
+                            title="コピー"
+                          >
+                            {copiedId === message.id ? (
+                                <Check className="h-3.5 w-3.5 text-green-500" />
+                            ) : (
+                                <Copy className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                          <div className="w-px h-3 bg-border mx-1" />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`h-7 w-7 ${
                               message.feedback === "good"
                                 ? "text-blue-500"
                                 : "text-muted-foreground hover:text-blue-500"
                             }`}
                             onClick={() => submitFeedback(message.id!, "good")}
+                            title="高評価"
                           >
-                            <ThumbsUp className="h-3 w-3" />
+                            <ThumbsUp className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className={`h-6 w-6 ${
+                            className={`h-7 w-7 ${
                               message.feedback === "bad"
                                 ? "text-red-500"
                                 : "text-muted-foreground hover:text-red-500"
                             }`}
                             onClick={() => submitFeedback(message.id!, "bad")}
+                            title="低評価"
                           >
-                            <ThumbsDown className="h-3 w-3" />
+                            <ThumbsDown className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       )}
