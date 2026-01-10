@@ -353,7 +353,7 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
               onKeyDown={handleKeyDown}
               placeholder="メッセージを入力... (Shift+Enterで改行)"
               disabled={isLoading}
-              className="min-h-[52px] max-h-[200px] resize-none pr-12 rounded-2xl border-border/50 focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50"
+              className="py-3 min-h-[52px] max-h-[300px] resize-none pr-12 rounded-2xl border-border/50 focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50 [field-sizing:content]"
               rows={1}
             />
             <Button
