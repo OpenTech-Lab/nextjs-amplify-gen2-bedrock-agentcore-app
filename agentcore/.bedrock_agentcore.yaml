@@ -30,7 +30,7 @@ agents:
     bedrock_agentcore:
       agent_id: mcp_agent_gen2-T26lUt3pz9
       agent_arn: arn:aws:bedrock-agentcore:ap-northeast-1:832780067678:runtime/mcp_agent_gen2-T26lUt3pz9
-      agent_session_id: 76ccb4ee-110b-4b30-82be-38bdba2b293a
+      agent_session_id: null
     codebuild:
       project_name: null
       execution_role: null

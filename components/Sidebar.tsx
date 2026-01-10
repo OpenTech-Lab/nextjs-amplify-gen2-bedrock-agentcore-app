@@ -66,7 +66,7 @@ export default function AppSidebar({
   ) => {
     e.stopPropagation();
 
-    if (!confirm("この会話を削除してもよろしいですか？")) return;
+    if (!confirm("Are you sure you want to delete this conversation?")) return;
 
     try {
       // Delete all messages in this session
@@ -93,7 +93,7 @@ export default function AppSidebar({
       }
     } catch (error) {
       console.error("Failed to delete session:", error);
-      alert("削除に失敗しました");
+      alert("Failed to delete");
     }
   };
 
@@ -147,14 +147,14 @@ export default function AppSidebar({
               className="w-full gap-2 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
             >
               <PlusCircle className="w-4 h-4" />
-              新しいチャット
+              New Chat
             </Button>
           </SidebarGroupContent>
         </SidebarGroup>
 
         {/* Chat History */}
         <SidebarGroup>
-          <SidebarGroupLabel>最近の会話</SidebarGroupLabel>
+          <SidebarGroupLabel>Recent Conversations</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {sessions.map((session) => (
@@ -186,7 +186,7 @@ export default function AppSidebar({
               ))}
               {sessions.length === 0 && (
                 <div className="px-4 py-2 text-xs text-muted-foreground">
-                  履歴はありません
+                  No history
                 </div>
               )}
             </SidebarMenu>
@@ -211,7 +211,7 @@ export default function AppSidebar({
                   <div className="text-sm font-medium truncate">{username}</div>
                   <div className="text-xs text-muted-foreground flex items-center gap-1">
                     <User className="w-3 h-3" />
-                    オンライン
+                    Online
                   </div>
                 </div>
               </div>
@@ -224,7 +224,7 @@ export default function AppSidebar({
               }}
             >
               <Settings className="w-4 h-4 mr-2" />
-              設定
+              Settings
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -232,12 +232,12 @@ export default function AppSidebar({
               {theme === "dark" ? (
                 <>
                   <Sun className="w-4 h-4 mr-2" />
-                  ライトモード
+                  Light Mode
                 </>
               ) : (
                 <>
                   <Moon className="w-4 h-4 mr-2" />
-                  ダークモード
+                  Dark Mode
                 </>
               )}
             </DropdownMenuItem>
@@ -247,7 +247,7 @@ export default function AppSidebar({
               className="text-destructive focus:text-destructive"
             >
               <LogOut className="w-4 h-4 mr-2" />
-              ログアウト
+              Logout
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

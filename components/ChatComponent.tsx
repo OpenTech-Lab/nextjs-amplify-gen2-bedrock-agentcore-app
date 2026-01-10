@@ -79,24 +79,24 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
             <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600">
               <Bot className="w-4 h-4 text-white" />
             </div>
-            <div className="text-sm font-medium">AI アシスタント</div>
+            <div className="text-sm font-medium">AI Assistant</div>
           </div>
         </div>
         <Badge className="text-xs text-muted-foreground bg-black/5">
           {isLoading ? (
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-              <span className="hidden sm:inline">応答中...</span>
+              <span className="hidden sm:inline">Responding...</span>
             </div>
           ) : error ? (
             <div className="flex items-center gap-1.5 text-destructive">
               <AlertCircle className="w-3 h-3" />
-              <span className="hidden sm:inline">エラー</span>
+              <span className="hidden sm:inline">Error</span>
             </div>
           ) : (
             <div className="flex items-center gap-1.5 text-green-600">
               <div className="w-2 h-2 rounded-full bg-green-500" />
-              <span className="hidden sm:inline">オンライン</span>
+              <span className="hidden sm:inline">Online</span>
             </div>
           )}
         </Badge>
@@ -111,10 +111,10 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
                 <Bot className="w-12 h-12 text-blue-500" />
               </div>
               <h2 className="text-xl font-semibold text-foreground mb-2">
-                チャットを始めましょう
+                Start a conversation
               </h2>
               <p className="text-sm text-muted-foreground max-w-md">
-                メッセージを入力してAIアシスタントとの会話を開始してください
+                Enter a message to begin chatting with the AI Assistant
               </p>
             </div>
           ) : (
@@ -150,12 +150,12 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
                     }`}
                   >
                     <div className="text-xs font-medium text-muted-foreground mb-1.5">
-                      {message.role === "user" ? "あなた" : "AI アシスタント"}
+                      {message.role === "user" ? "You" : "AI Assistant"}
                     </div>
                     <div
                       className={`inline-block max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 ${
                         message.role === "user"
-                          ? "bg-gradient-to-br from-blue-600 to-blue-500 text-white"
+                          ? "bg-gradient-to-br from-blue-600 to-blue-500 text-white text-left"
                           : "bg-muted/50 border border-border/50"
                       }`}
                     >
@@ -279,7 +279,7 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
                               onClick={() =>
                                 copyToClipboard(message.content, message.id!)
                               }
-                              title="コピー"
+                              title="Copy"
                             >
                               {copiedId === message.id ? (
                                 <Check className="h-3.5 w-3.5 text-green-500" />
@@ -299,7 +299,7 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
                               onClick={() =>
                                 submitFeedback(message.id!, "good")
                               }
-                              title="高評価"
+                              title="Good"
                             >
                               <ThumbsUp className="h-3.5 w-3.5" />
                             </Button>
@@ -312,7 +312,7 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
                                   : "text-muted-foreground hover:text-red-500"
                               }`}
                               onClick={() => submitFeedback(message.id!, "bad")}
-                              title="低評価"
+                              title="Bad"
                             >
                               <ThumbsDown className="h-3.5 w-3.5" />
                             </Button>
@@ -351,7 +351,7 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="メッセージを入力... (Shift+Enterで改行)"
+              placeholder="Type a message... (Shift+Enter for new line)"
               disabled={isLoading}
               className="py-3 min-h-[52px] max-h-[300px] resize-none pr-12 rounded-2xl border-border/50 focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50 [field-sizing:content]"
               rows={1}
@@ -370,7 +370,7 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-2 text-center">
-            AIは間違いを犯す可能性があります。重要な情報は確認してください。
+            AI can make mistakes. Please verify important information.
           </p>
         </div>
       </div>

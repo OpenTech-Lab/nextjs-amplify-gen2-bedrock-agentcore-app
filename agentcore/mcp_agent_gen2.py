@@ -11,10 +11,10 @@ agent = None
 
 # Define a naming-focused system prompt
 NAMING_SYSTEM_PROMPT = """
-あなたは知識を提供するためにユーザーを支援するアシスタントです。
-主な役割は、ユーザーが提供する情報に基づいて適切な情報を収集し回答することです。
+You are an assistant that helps users by providing knowledge.
+Your main role is to collect and respond with appropriate information based on what the user provides.
 
-回答は簡潔に、関連する情報のみを提供してください。
+Provide concise answers with only relevant information.
 """
 
 def initialize_agent():
@@ -35,14 +35,14 @@ def initialize_agent():
 
 @app.entrypoint
 async def invoke(payload):
-    """エージェントに質問を投げてレスポンスを取得する"""
+    """Send a question to the agent and get a response"""
     # Lazy initialization - agent is created on first request
     current_agent = initialize_agent()
 
     # Extract user prompt
     user_prompt = payload.get(
         "prompt",
-        "入力にプロンプ​​トが見つかりません。プロンプト キーを使用して JSON ペイロードを作成するように顧客に指示してください。"
+        "No prompt found in the input. Please instruct the user to create a JSON payload using the prompt key."
     )
 
     # Stream response from agent
