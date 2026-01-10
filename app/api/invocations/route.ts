@@ -50,9 +50,9 @@ export async function POST(req: Request) {
       runtimeSessionId
     );
 
-    // Prepare payload as JSON string (matching boto3 format)
+    // Prepare payload as JSON string (matching AgentCore Python entrypoint format)
     const payload = JSON.stringify({
-      inputText: inputText,
+      prompt: inputText,
     });
 
     const command = new InvokeAgentRuntimeCommand({
