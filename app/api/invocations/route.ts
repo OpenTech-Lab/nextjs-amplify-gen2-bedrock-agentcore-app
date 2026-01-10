@@ -1,35 +1,138 @@
-import { createAmazonBedrock } from "@ai-sdk/amazon-bedrock";
+import {
+  BedrockAgentCoreClient,
+  InvokeAgentRuntimeCommand,
+} from "@aws-sdk/client-bedrock-agentcore";
 import { fromNodeProviderChain } from "@aws-sdk/credential-providers";
-import { convertToModelMessages, streamText, UIMessage } from "ai";
+import { UIMessage } from "ai";
 
 export const maxDuration = 30;
 
-const bedrock = createAmazonBedrock({
+const client = new BedrockAgentCoreClient({
   region: "ap-northeast-1",
-  credentialProvider: fromNodeProviderChain(),
+  credentials: fromNodeProviderChain(),
 });
 
+// AgentCore runtime ARN
+const RUNTIME_ARN =
+  process.env.RUNTIME_ARN ||
+  "arn:aws:bedrock-agentcore:ap-northeast-1:832780067678:runtime/mcp_agent_gen2-T26lUt3pz9";
+
 export async function POST(req: Request) {
-  const {
-    messages,
-    model = "anthropic.claude-3-5-sonnet-20240620-v1:0",
-  }: {
-    messages: UIMessage[];
-    model: string;
-  } = await req.json();
+  try {
+    const {
+      messages,
+    }: {
+      messages: UIMessage[];
+    } = await req.json();
 
-  const result = streamText({
-    model: bedrock(model),
-    messages: await convertToModelMessages(messages),
-    system: `
-      あなたは知識を提供するためにユーザーを支援するアシスタントです。
-      主な役割は、ユーザーが提供する情報に基づいて適切な情報を収集し回答することです。
-      回答は簡潔に、関連する情報のみを提供してください。
-      `,
-  });
+    console.log("Received request with messages:", messages);
 
-  return result.toUIMessageStreamResponse({
-    sendSources: true,
-    sendReasoning: true,
-  });
+    // Convert messages to AgentCore format (last message is the user input)
+    const lastMessage = messages[messages.length - 1];
+    const inputText =
+      typeof lastMessage.content === "string"
+        ? lastMessage.content
+        : lastMessage.content
+            .map((part) => (part.type === "text" ? part.text : ""))
+            .join("");
+
+    console.log("Input text:", inputText);
+
+    // Generate session ID (must be >= 33 chars)
+    const runtimeSessionId = `session-${Date.now()}-${Math.random()
+      .toString(36)
+      .substring(2, 15)}-${Math.random().toString(36).substring(2, 15)}`;
+
+    console.log(
+      "Invoking AgentCore runtime:",
+      RUNTIME_ARN,
+      "with sessionId:",
+      runtimeSessionId
+    );
+
+    // Prepare payload as JSON string (matching boto3 format)
+    const payload = JSON.stringify({
+      inputText: inputText,
+    });
+
+    const command = new InvokeAgentRuntimeCommand({
+      agentRuntimeArn: RUNTIME_ARN,
+      runtimeSessionId,
+      payload: Buffer.from(payload),
+      contentType: "application/json",
+      accept: "application/json",
+    });
+
+    const response = await client.send(command);
+
+    console.log("AgentCore response received");
+    console.log("Response keys:", Object.keys(response));
+
+    // Stream the response as SSE
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          // The response stream is in the 'response' property
+          const outputStream = response.response;
+
+          if (outputStream) {
+            let chunkCount = 0;
+            for await (const chunk of outputStream) {
+              chunkCount++;
+
+              // The chunk is a Uint8Array, decode it to string
+              let chunkStr = "";
+              if (chunk instanceof Uint8Array) {
+                chunkStr = decoder.decode(chunk);
+              } else if (typeof chunk === "string") {
+                chunkStr = chunk;
+              } else {
+                chunkStr = JSON.stringify(chunk);
+              }
+
+              console.log(`Chunk ${chunkCount}:`, chunkStr);
+
+              // Forward the chunk as-is (it's already in SSE format)
+              controller.enqueue(
+                chunk instanceof Uint8Array ? chunk : encoder.encode(chunkStr)
+              );
+            }
+            console.log(`Stream complete. Total chunks: ${chunkCount}`);
+          } else {
+            console.log(
+              "No output stream found in response. Available keys:",
+              Object.keys(response)
+            );
+          }
+          controller.close();
+        } catch (error) {
+          console.error("Streaming error:", error);
+          controller.error(error);
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  } catch (error) {
+    console.error("AgentCore invocation error:", error);
+    console.error("Error details:", JSON.stringify(error, null, 2));
+    return new Response(
+      JSON.stringify({
+        error: error instanceof Error ? error.message : "Unknown error",
+        details: error instanceof Error ? error.stack : String(error),
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
 }

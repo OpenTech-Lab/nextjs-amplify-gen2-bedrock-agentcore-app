@@ -1,25 +1,9 @@
 import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "./useAuth";
-import { fetchAuthSession } from "aws-amplify/auth";
-import { SignatureV4 } from "@aws-sdk/signature-v4";
-import { Sha256 } from "@aws-crypto/sha256-js";
-import { HttpRequest } from "@aws-sdk/protocol-http";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "@/amplify/data/resource";
 
 const client = generateClient<Schema>();
-
-function buildApiUrl() {
-  if (process.env.NEXT_PUBLIC_AGENT_ARN) {
-    const agentArn = process.env.NEXT_PUBLIC_AGENT_ARN!;
-    const region = process.env.NEXT_PUBLIC_AWS_REGION || "us-east-1";
-    const escapedArn = encodeURIComponent(agentArn);
-    const qualifier = process.env.NEXT_PUBLIC_QUALIFIER || "DRAFT";
-    return `https://bedrock-agentcore.${region}.amazonaws.com/runtimes/${escapedArn}/invocations?qualifier=${qualifier}`;
-  } else {
-    return "/api/invocations";
-  }
-}
 
 /**
  * SSEチャット機能のオプション設定
@@ -55,7 +39,7 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
   // Load history on mount
   useEffect(() => {
     if (!sessionId) return;
-    
+
     // Define the type for the API response items
     interface MessageRecord {
       id: string;
@@ -69,37 +53,39 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
       try {
         // Fetch messages by sessionId using the secondary index
         const { data: history } = await client.models.Message.list({
-             filter: { sessionId: { eq: sessionId } } 
+          filter: { sessionId: { eq: sessionId } },
         });
-        
+
         // Sort explicitly by createdAt if needed, assuming list returns order or sort manually
         // Since we don't have a sort key in the index yet, we sort in JS
         const sortedHistory = (history as unknown as MessageRecord[]).sort(
-            (a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+          (a, b) =>
+            new Date(a.createdAt || 0).getTime() -
+            new Date(b.createdAt || 0).getTime()
         );
 
         const loadedMessages: Message[] = [];
         sortedHistory.forEach((record) => {
-            // Reconstruct conversation pairs
-            if (record.userMessage) {
-                loadedMessages.push({
-                    role: "user",
-                    content: record.userMessage,
-                    id: record.id // Optional: link user message to record too? Or just assistant
-                });
-            }
-            if (record.aiResponse) {
-                loadedMessages.push({
-                    role: "assistant",
-                    content: record.aiResponse,
-                    id: record.id,
-                    feedback: (record.feedback as "good" | "bad") || undefined
-                });
-            }
+          // Reconstruct conversation pairs
+          if (record.userMessage) {
+            loadedMessages.push({
+              role: "user",
+              content: record.userMessage,
+              id: record.id, // Optional: link user message to record too? Or just assistant
+            });
+          }
+          if (record.aiResponse) {
+            loadedMessages.push({
+              role: "assistant",
+              content: record.aiResponse,
+              id: record.id,
+              feedback: (record.feedback as "good" | "bad") || undefined,
+            });
+          }
         });
 
         if (loadedMessages.length > 0) {
-            setMessages(loadedMessages);
+          setMessages(loadedMessages);
         }
       } catch (e) {
         console.error("Failed to load chat history:", e);
@@ -143,19 +129,21 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
           sessionId,
         });
         savedMessageId = newMessage?.id;
-        
+
         // Update state with the backend ID for the AI message (we'll attach it to the pair)
         // Here we associate the ID with the assistant message so we can update it later
         if (savedMessageId) {
-             setMessages((prev) => {
-                const newMessages = [...prev];
-                const lastMessageIndex = newMessages.length - 1;
-                // Associate ID with the assistant message so users can rate the RESPONSE
-                newMessages[lastMessageIndex] = { ...newMessages[lastMessageIndex], id: savedMessageId };
-                return newMessages;
-             });
+          setMessages((prev) => {
+            const newMessages = [...prev];
+            const lastMessageIndex = newMessages.length - 1;
+            // Associate ID with the assistant message so users can rate the RESPONSE
+            newMessages[lastMessageIndex] = {
+              ...newMessages[lastMessageIndex],
+              id: savedMessageId,
+            };
+            return newMessages;
+          });
         }
-
       } catch (e) {
         console.error("Failed to save user message:", e);
       }
@@ -163,50 +151,38 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
       // Create or update ChatSession
       if (messages.length === 0) {
         try {
-           // Check if session exists first (to avoid duplicates if re-rendering)
-           const { data: sessions } = await client.models.ChatSession.list({
-               filter: { sessionId: { eq: sessionId } }
-           });
-           
-           if (sessions.length === 0) {
-               await client.models.ChatSession.create({
-                   sessionId,
-                   name: prompt.slice(0, 50) + (prompt.length > 50 ? "..." : "")
-               });
-           }
+          // Check if session exists first (to avoid duplicates if re-rendering)
+          const { data: sessions } = await client.models.ChatSession.list({
+            filter: { sessionId: { eq: sessionId } },
+          });
+
+          if (sessions.length === 0) {
+            await client.models.ChatSession.create({
+              sessionId,
+              name: prompt.slice(0, 50) + (prompt.length > 50 ? "..." : ""),
+            });
+          }
         } catch (e) {
-            console.error("Failed to create chat session:", e);
+          console.error("Failed to create chat session:", e);
         }
       }
 
-      // 認証トークンを取得
-      const session = await fetchAuthSession();
-      const token = session.tokens?.accessToken?.toString();
-      if (!token) {
-        setError("認証トークンが取得できません");
-        setIsLoading(false);
-        return;
-      }
-
-      console.log("Sending request to Lambda Function URL...");
+      console.log("Sending request to backend API...");
 
       try {
-        const functionUrl = buildApiUrl();
-
+        // Use backend API endpoint
         const requestBody = {
-          prompt,
-          model: "anthropic.claude-3-5-sonnet-20240620-v1:0",
-          reasoning: true,
+          messages: [
+            ...messages.filter((msg) => !msg.id || msg.id),
+            { role: "user", content: prompt },
+          ],
         };
 
-        const response = await fetch(functionUrl, {
+        // Send request to backend
+        const response = await fetch("/api/invocations", {
           method: "POST",
-          mode: "cors",
           headers: {
             "Content-Type": "application/json",
-            Accept: "text/event-stream",
-            Authorization: `Bearer ${token}`,
-            "X-Amzn-Bedrock-AgentCore-Runtime-Session-Id": sessionId,
           },
           body: JSON.stringify(requestBody),
         });
@@ -224,21 +200,14 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
             errorData = { error: errorText || "Unknown error" };
           }
 
-          // If CORS blocked upstream (e.g., Function URL not configured), the browser
-          // reports 403 with missing CORS headers. Surface a clearer hint.
           const msg =
             errorData.error ||
             errorData.message ||
             `HTTP ${response.status}: ${response.statusText || errorText}`;
-          throw new Error(
-            response.status === 403 &&
-            !response.headers.get("access-control-allow-origin")
-              ? `${msg} (CORS: Function URL must allow your origin and headers)`
-              : msg
-          );
+          throw new Error(msg);
         }
 
-        // Handle SSE streaming response
+        // Handle SSE streaming response from AgentCore
         const reader = response.body?.getReader();
         if (!reader) {
           throw new Error("Response body is not readable");
@@ -271,43 +240,62 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
                 break;
               }
 
+              let parsed;
               try {
-                const parsed = JSON.parse(data);
+                parsed = JSON.parse(data);
+                console.log("Received chunk:", JSON.stringify(parsed, null, 2));
+              } catch (parseError) {
+                console.error(
+                  "JSON parse error:",
+                  parseError,
+                  "for data:",
+                  data
+                );
+                continue;
+              }
 
-                // Handle error messages
-                if (parsed.error) {
-                  throw new Error(parsed.error);
-                }
+              // Handle error messages from the stream
+              if (parsed.error) {
+                throw new Error(parsed.error);
+              }
 
-                // Append text chunks to the current message
-                if (parsed.text) {
-                  aiResponseAccumulator += parsed.text;
-                  
+              // AgentCore format: {"event": {"contentBlockDelta": {"delta": {"text": "..."}}}}
+              if (
+                parsed.event &&
+                parsed.event.contentBlockDelta &&
+                parsed.event.contentBlockDelta.delta
+              ) {
+                const text = parsed.event.contentBlockDelta.delta.text;
+                if (text) {
+                  aiResponseAccumulator += text;
+
                   setMessages((prev) => {
                     const newMessages = [...prev];
                     const lastMessageIndex = newMessages.length - 1;
                     const lastMessage = { ...newMessages[lastMessageIndex] };
-                    
+
                     if (lastMessage.role === "assistant") {
-                      // Replace content with the full accumulated text to prevent duplication issues
                       lastMessage.content = aiResponseAccumulator;
                       newMessages[lastMessageIndex] = lastMessage;
                     }
                     return newMessages;
                   });
                 }
-              } catch (parseError) {
-                if (
-                  parseError instanceof Error &&
-                  parseError.message.startsWith("An error occurred")
-                ) {
-                  throw parseError;
-                }
-                console.error(
-                  "JSON parse error:",
-                  parseError,
-                  "for data:",
-                  data
+              }
+
+              // Handle message start
+              if (parsed.event && parsed.event.messageStart) {
+                console.log(
+                  "Message start, role:",
+                  parsed.event.messageStart.role
+                );
+              }
+
+              // Handle message stop
+              if (parsed.event && parsed.event.messageStop) {
+                console.log(
+                  "Message stopped, reason:",
+                  parsed.event.messageStop.stopReason
                 );
               }
             }
@@ -326,14 +314,19 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
           }
         }
       } catch (fetchError) {
+        const errorMessage =
+          fetchError instanceof Error ? fetchError.message : "Unknown error";
+        const isClientInitError =
+          typeof errorMessage === "string" &&
+          errorMessage.toLowerCase().includes("client initialization failed");
+        const canRetry = retryCount < maxRetries && !isClientInitError;
+
         // 自動再試行（指数バックオフ）
-        if (retryCount < maxRetries) {
+        if (canRetry) {
           setTimeout(() => {
             sendMessage(prompt, retryCount + 1);
           }, retryDelay * Math.pow(2, retryCount));
         } else {
-          const errorMessage =
-            fetchError instanceof Error ? fetchError.message : "Unknown error";
           setError(`通信エラー: ${errorMessage}`);
         }
       } finally {
@@ -354,25 +347,26 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
   /**
    * AIの応答にフィードバックを送信する
    */
-  const submitFeedback = useCallback(async (messageId: string, feedback: "good" | "bad") => {
-    // Update local state first for immediate UI response
-    setMessages((prev) => 
-        prev.map((msg) => 
-            msg.id === messageId ? { ...msg, feedback } : msg
-        )
-    );
+  const submitFeedback = useCallback(
+    async (messageId: string, feedback: "good" | "bad") => {
+      // Update local state first for immediate UI response
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === messageId ? { ...msg, feedback } : msg))
+      );
 
-    // Update backend
-    try {
+      // Update backend
+      try {
         await client.models.Message.update({
-            id: messageId,
-            feedback,
+          id: messageId,
+          feedback,
         });
-    } catch (e) {
+      } catch (e) {
         console.error("Failed to submit feedback:", e);
         // Optionally revert local state on error
-    }
-  }, []);
+      }
+    },
+    []
+  );
 
   return {
     messages, // メッセージ履歴

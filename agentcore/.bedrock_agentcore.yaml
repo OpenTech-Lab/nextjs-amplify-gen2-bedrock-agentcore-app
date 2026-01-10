@@ -1,84 +1,21 @@
 default_agent: mcp_agent_gen2
 agents:
-  mcp_agent:
-    name: mcp_agent
-    entrypoint: /home/toyofumi/Project/nextjs-amplify-gen1-bedrock-agentcore-app/agentcore/mcp_agent.py
-    deployment_type: container
-    runtime_type: null
-    platform: linux/amd64
-    container_runtime: docker
-    source_path: /home/toyofumi/Project/nextjs-amplify-gen1-bedrock-agentcore-app/agentcore
-    aws:
-      execution_role: arn:aws:iam::832780067678:role/AmazonBedrockAgentCoreSDKRuntime-ap-northeast-1-15546741b7
-      execution_role_auto_create: false
-      account: '832780067678'
-      region: ap-northeast-1
-      ecr_repository: 832780067678.dkr.ecr.ap-northeast-1.amazonaws.com/bedrock-agentcore-mcp_agent
-      ecr_auto_create: false
-      s3_path: null
-      s3_auto_create: false
-      network_configuration:
-        network_mode: PUBLIC
-        network_mode_config: null
-      protocol_configuration:
-        server_protocol: HTTP
-      observability:
-        enabled: true
-      lifecycle_configuration:
-        idle_runtime_session_timeout: null
-        max_lifetime: null
-    bedrock_agentcore:
-      agent_id: mcp_agent-D4IDD3BLGz
-      agent_arn: arn:aws:bedrock-agentcore:ap-northeast-1:832780067678:runtime/mcp_agent-D4IDD3BLGz
-      agent_session_id: null
-    codebuild:
-      project_name: bedrock-agentcore-mcp_agent-builder
-      execution_role: arn:aws:iam::832780067678:role/AmazonBedrockAgentCoreSDKCodeBuild-ap-northeast-1-15546741b7
-      source_bucket: bedrock-agentcore-codebuild-sources-832780067678-ap-northeast-1
-    memory:
-      mode: STM_AND_LTM
-      memory_id: my_agent_mem-S18JfcBQcc
-      memory_arn: null
-      memory_name: mcp_agent_memory
-      event_expiry_days: 30
-      first_invoke_memory_check_done: false
-      was_created_by_toolkit: false
-    identity:
-      credential_providers: []
-      workload: null
-    aws_jwt:
-      enabled: false
-      audiences: []
-      signing_algorithm: ES384
-      issuer_url: null
-      duration_seconds: 300
-    authorizer_configuration:
-      customJWTAuthorizer:
-        discoveryUrl: https://cognito-idp.ap-northeast-1.amazonaws.com/ap-northeast-1_A7Y7qA18g/.well-known/openid-configuration
-        allowedClients:
-        - 3faqnmvor5smg5pht2d4ogl5pv
-        - 5jds7t38fnstk495kvmea444gu
-    request_header_configuration: null
-    oauth_configuration: null
-    api_key_env_var_name: null
-    api_key_credential_provider_name: null
-    is_generated_by_agentcore_create: false
   mcp_agent_gen2:
     name: mcp_agent_gen2
     entrypoint: /home/toyofumi/Project/nextjs-amplify-gen2-bedrock-agentcore-app/agentcore/mcp_agent_gen2.py
-    deployment_type: container
-    runtime_type: null
+    deployment_type: direct_code_deploy
+    runtime_type: PYTHON_3_13
     platform: linux/arm64
-    container_runtime: docker
+    container_runtime: null
     source_path: /home/toyofumi/Project/nextjs-amplify-gen2-bedrock-agentcore-app/agentcore
     aws:
       execution_role: arn:aws:iam::832780067678:role/AmazonBedrockAgentCoreSDKRuntime-ap-northeast-1-ab8ab1dc0a
       execution_role_auto_create: false
       account: '832780067678'
       region: ap-northeast-1
-      ecr_repository: 832780067678.dkr.ecr.ap-northeast-1.amazonaws.com/bedrock-agentcore-mcp_agent_gen2
+      ecr_repository: null
       ecr_auto_create: false
-      s3_path: null
+      s3_path: s3://bedrock-agentcore-codebuild-sources-832780067678-ap-northeast-1
       s3_auto_create: false
       network_configuration:
         network_mode: PUBLIC
@@ -91,37 +28,71 @@ agents:
         idle_runtime_session_timeout: null
         max_lifetime: null
     bedrock_agentcore:
-      agent_id: mcp_agent_gen2-BozMaOAa8T
-      agent_arn: arn:aws:bedrock-agentcore:ap-northeast-1:832780067678:runtime/mcp_agent_gen2-BozMaOAa8T
+      agent_id: mcp_agent_gen2-T26lUt3pz9
+      agent_arn: arn:aws:bedrock-agentcore:ap-northeast-1:832780067678:runtime/mcp_agent_gen2-T26lUt3pz9
+      agent_session_id: 76ccb4ee-110b-4b30-82be-38bdba2b293a
+    codebuild:
+      project_name: null
+      execution_role: null
+      source_bucket: null
+    memory:
+      mode: STM_ONLY
+      memory_id: mcp_agent_gen2_mem-IupEbc5rwN
+      memory_arn: arn:aws:bedrock-agentcore:ap-northeast-1:832780067678:memory/mcp_agent_gen2_mem-IupEbc5rwN
+      memory_name: mcp_agent_gen2_mem
+      event_expiry_days: 30
+      first_invoke_memory_check_done: true
+      was_created_by_toolkit: false
+    authorizer_configuration: null
+    request_header_configuration: null
+    oauth_configuration: null
+  Enter:
+    name: Enter
+    entrypoint: /home/toyofumi/Project/nextjs-amplify-gen2-bedrock-agentcore-app/agentcore/mcp_agent_gen2.py
+    deployment_type: direct_code_deploy
+    runtime_type: PYTHON_3_13
+    platform: linux/arm64
+    container_runtime: null
+    source_path: /home/toyofumi/Project/nextjs-amplify-gen2-bedrock-agentcore-app/agentcore
+    aws:
+      execution_role: arn:aws:iam::832780067678:role/AmazonBedrockAgentCoreSDKRuntime-ap-northeast-1-dc8659db6d
+      execution_role_auto_create: false
+      account: '832780067678'
+      region: ap-northeast-1
+      ecr_repository: null
+      ecr_auto_create: false
+      s3_path: s3://bedrock-agentcore-codebuild-sources-832780067678-ap-northeast-1
+      s3_auto_create: false
+      network_configuration:
+        network_mode: PUBLIC
+        network_mode_config: null
+      protocol_configuration:
+        server_protocol: HTTP
+      observability:
+        enabled: true
+      lifecycle_configuration:
+        idle_runtime_session_timeout: null
+        max_lifetime: null
+    bedrock_agentcore:
+      agent_id: null
+      agent_arn: null
       agent_session_id: null
     codebuild:
-      project_name: bedrock-agentcore-mcp_agent_gen2-builder
-      execution_role: arn:aws:iam::832780067678:role/AmazonBedrockAgentCoreSDKCodeBuild-ap-northeast-1-ab8ab1dc0a
-      source_bucket: bedrock-agentcore-codebuild-sources-832780067678-ap-northeast-1
+      project_name: null
+      execution_role: null
+      source_bucket: null
     memory:
       mode: STM_AND_LTM
       memory_id: mcp_agent_gen2_mem-IupEbc5rwN
       memory_arn: null
-      memory_name: mcp_agent_gen2_memory
+      memory_name: Enter_memory
       event_expiry_days: 30
       first_invoke_memory_check_done: false
       was_created_by_toolkit: false
-    identity:
-      credential_providers: []
-      workload: null
-    aws_jwt:
-      enabled: false
-      audiences: []
-      signing_algorithm: ES384
-      issuer_url: null
-      duration_seconds: 300
     authorizer_configuration:
       customJWTAuthorizer:
-        discoveryUrl: https://cognito-idp.ap-northeast-1.amazonaws.com/ap-northeast-1_0wU0wAyRD/.well-known/openid-configuration
-        allowedClients:
+        issuerUrl: https://cognito-idp.ap-northeast-1.amazonaws.com/ap-northeast-1_0wU0wAyRD
+        audienceClientIds:
         - 3j65bomu8qb217padobevhbq50
     request_header_configuration: null
     oauth_configuration: null
-    api_key_env_var_name: null
-    api_key_credential_provider_name: null
-    is_generated_by_agentcore_create: false

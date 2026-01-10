@@ -1,0 +1,78 @@
+🚀 Launching Bedrock AgentCore (cloud mode - RECOMMENDED)...
+   • Deploy Python code directly to runtime
+   • No Docker required (DEFAULT behavior)
+   • Production-ready deployment
+
+💡 Deployment options:
+   • agentcore launch                → Cloud (current)
+   • agentcore launch --local        → Local development
+
+Launching with direct_code_deploy deployment for agent 'mcp_agent_gen2'
+Ensuring execution role...
+Getting or creating execution role for agent: mcp_agent_gen2
+Using AWS region: ap-northeast-1, account ID: 832780067678
+Role name: AmazonBedrockAgentCoreSDKRuntime-ap-northeast-1-ab8ab1dc0a
+✅ Reusing existing execution role: arn:aws:iam::832780067678:role/AmazonBedrockAgentCoreSDKRuntime-ap-northeast-1-ab8ab1dc0a
+Execution role available: arn:aws:iam::832780067678:role/AmazonBedrockAgentCoreSDKRuntime-ap-northeast-1-ab8ab1dc0a
+Creating memory resource for agent: mcp_agent_gen2
+✅ MemoryManager initialized for region: ap-northeast-1
+🔎 Retrieving memory resource with ID: mcp_agent_gen2_mem-IupEbc5rwN...
+  Found memory: mcp_agent_gen2_mem-IupEbc5rwN
+Found existing memory in cloud: mcp_agent_gen2_mem-IupEbc5rwN
+Existing memory has 0 strategies
+⏳ Waiting for existing memory to become ACTIVE...
+Waiting for memory mcp_agent_gen2_mem-IupEbc5rwN to return to ACTIVE state and strategies to reach terminal states...
+Memory mcp_agent_gen2_mem-IupEbc5rwN is ACTIVE and all strategies are in terminal states (took 0 seconds)
+[21:36:30]    ✅ Memory is ACTIVE (took 0s)                                                 manager.py:1037
+Using existing STM-only memory
+Using entrypoint: mcp_agent_gen2.py (relative to /home/toyofumi/Project/nextjs-amplify-gen2-bedrock-agentcore-app/agentcore)
+Creating deployment package...
+✓ Using cached dependencies (no changes detected)
+Packaging source code...
+Creating deployment package...
+✓ Deployment package ready: 69.34 MB
+Getting or creating S3 bucket for agent: mcp_agent_gen2
+S3 bucket available: s3://bedrock-agentcore-codebuild-sources-832780067678-ap-northeast-1
+Uploading deployment package to S3...
+Uploading to s3://bedrock-agentcore-codebuild-sources-832780067678-ap-northeast-1/mcp_agent_gen2/deployment.zip...
+✓ Deployment package uploaded: s3://bedrock-agentcore-codebuild-sources-832780067678-ap-northeast-1/mcp_agent_gen2/deployment.zip
+Deploying to Bedrock AgentCore Runtime...
+⚠️ Session ID will be reset to connect to the updated agent. The previous agent remains accessible via the original session ID: a36ddfa3-219c-4721-920b-eab531de98be
+✅ Agent created/updated: arn:aws:bedrock-agentcore:ap-northeast-1:832780067678:runtime/mcp_agent_gen2-T26lUt3pz9
+Waiting for agent endpoint to be ready...
+Enabling observability...
+CloudWatch Logs resource policy already configured
+X-Ray trace destination already configured
+X-Ray indexing rule already configured
+Transaction Search already fully configured
+🔍 GenAI Observability Dashboard: https://console.aws.amazon.com/cloudwatch/home?region=ap-northeast-1#gen-ai-observability/agent-core
+✅ Deployment completed successfully - Agent: arn:aws:bedrock-agentcore:ap-northeast-1:832780067678:runtime/mcp_agent_gen2-T26lUt3pz9
+✅ Reusing existing S3 bucket: bedrock-agentcore-codebuild-sources-832780067678-ap-northeast-1
+╭────────────────────────────────────────── Deployment Success ───────────────────────────────────────────╮
+│ Agent Details:                                                                                          │
+│ Agent Name: mcp_agent_gen2                                                                              │
+│ Agent ARN: arn:aws:bedrock-agentcore:ap-northeast-1:832780067678:runtime/mcp_agent_gen2-T26lUt3pz9      │
+│ Deployment Type: Direct Code Deploy                                                                     │
+│                                                                                                         │
+│ 📦 Code package deployed to Bedrock AgentCore                                                           │
+│                                                                                                         │
+│ Next Steps:                                                                                             │
+│    agentcore status                                                                                     │
+│    agentcore invoke '{"prompt": "Hello"}'                                                               │
+│                                                                                                         │
+│ 📋 CloudWatch Logs:                                                                                     │
+│    /aws/bedrock-agentcore/runtimes/mcp_agent_gen2-T26lUt3pz9-DEFAULT --log-stream-name-prefix           │
+│ "2026/01/10/[runtime-logs"                                                                              │
+│    /aws/bedrock-agentcore/runtimes/mcp_agent_gen2-T26lUt3pz9-DEFAULT --log-stream-names "otel-rt-logs"  │
+│                                                                                                         │
+│ 🔍 GenAI Observability Dashboard:                                                                       │
+│    https://console.aws.amazon.com/cloudwatch/home?region=ap-northeast-1#gen-ai-observability/agent-core │
+│                                                                                                         │
+│ ⏱️  Note: Observability data may take up to 10 minutes to appear after first launch                      │
+│                                                                                                         │
+│ 💡 Tail logs with:                                                                                      │
+│    aws logs tail /aws/bedrock-agentcore/runtimes/mcp_agent_gen2-T26lUt3pz9-DEFAULT                      │
+│ --log-stream-name-prefix "2026/01/10/[runtime-logs" --follow                                            │
+│    aws logs tail /aws/bedrock-agentcore/runtimes/mcp_agent_gen2-T26lUt3pz9-DEFAULT                      │
+│ --log-stream-name-prefix "2026/01/10/[runtime-logs" --since 1h                                          │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────╯

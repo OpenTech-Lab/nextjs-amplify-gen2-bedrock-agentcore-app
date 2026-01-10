@@ -14,6 +14,7 @@
     "@aws-amplify/platform-core": "^1.10.3",
     "@aws-amplify/ui-react": "^6.5.5",
     "@aws-crypto/sha256-js": "^5.2.0",
+    "@aws-sdk/client-bedrock-agentcore": "^3.966.0",
     "@aws-sdk/credential-providers": "^3.957.0",
     "@aws-sdk/protocol-http": "^3.370.0",
     "@aws-sdk/signature-v4": "^3.370.0",
