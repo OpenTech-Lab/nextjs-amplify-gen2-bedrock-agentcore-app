@@ -215,7 +215,6 @@ export default function AppSidebar({
                   </div>
                 </div>
               </div>
-              <ChevronUp className="w-4 h-4 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" align="end" className="w-56">
