@@ -8,7 +8,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Spinner } from "@/components/ui/spinner";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Send, User, Bot, AlertCircle, ThumbsUp, ThumbsDown, Copy, Check } from "lucide-react";
+import {
+  Send,
+  User,
+  Bot,
+  AlertCircle,
+  ThumbsUp,
+  ThumbsDown,
+  Copy,
+  Check,
+} from "lucide-react";
 import { Badge } from "./ui/badge";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -24,7 +33,8 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { messages, sendMessage, isLoading, error, submitFeedback } = useSSEChat(sessionId);
+  const { messages, sendMessage, isLoading, error, submitFeedback } =
+    useSSEChat(sessionId);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -145,11 +155,17 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
                     <div
                       className={`inline-block max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 ${
                         message.role === "user"
-                          ? "bg-gradient-to-br from-blue-100 to-blue-50 text-white"
-                          : "bg-muted/50 text-foreground border border-border/50"
+                          ? "bg-gradient-to-br from-blue-600 to-blue-500 text-white"
+                          : "bg-muted/50 border border-border/50"
                       }`}
                     >
-                      <div className="text-[15px] leading-relaxed break-words prose prose-sm max-w-none dark:prose-invert prose-p:my-2 prose-pre:my-2 prose-headings:my-3">
+                      <div
+                        className={`text-[15px] leading-relaxed break-words prose prose-sm max-w-none prose-p:my-2 prose-pre:my-2 prose-headings:my-3 ${
+                          message.role === "user"
+                            ? "prose-invert text-white"
+                            : "prose-neutral dark:prose-invert text-gray-900 dark:text-gray-100"
+                        }`}
+                      >
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
@@ -161,8 +177,8 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
                                 <code
                                   className={`${
                                     message.role === "user"
-                                      ? "bg-blue-700/50"
-                                      : "bg-muted"
+                                      ? "bg-blue-700/50 text-blue-50"
+                                      : "bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                                   } rounded px-1.5 py-0.5 text-sm font-mono`}
                                   {...props}
                                 >
@@ -173,10 +189,17 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
                                   className={`${
                                     message.role === "user"
                                       ? "bg-blue-700/50"
-                                      : "bg-muted"
+                                      : "bg-gray-100 dark:bg-gray-900"
                                   } rounded-lg p-3 overflow-x-auto my-2`}
                                 >
-                                  <code className={className} {...props}>
+                                  <code
+                                    className={`${className} ${
+                                      message.role === "assistant"
+                                        ? "text-gray-900 dark:text-gray-100"
+                                        : ""
+                                    }`}
+                                    {...props}
+                                  >
                                     {children}
                                   </code>
                                 </pre>
@@ -188,7 +211,7 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
                                 className={`${
                                   message.role === "user"
                                     ? "text-blue-100 hover:text-white"
-                                    : "text-blue-600 hover:text-blue-800"
+                                    : "text-blue-700 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
                                 } underline`}
                                 target="_blank"
                                 rel="noopener noreferrer"
@@ -226,8 +249,8 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
                               <blockquote
                                 className={`border-l-4 ${
                                   message.role === "user"
-                                    ? "border-blue-300"
-                                    : "border-muted-foreground"
+                                    ? "border-blue-300 text-blue-50"
+                                    : "border-gray-400 dark:border-gray-600 text-gray-700 dark:text-gray-300"
                                 } pl-4 italic my-2`}
                                 {...props}
                               >
@@ -245,52 +268,56 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
                           )}
                       </div>
                       {/* Control Panel (Feedback & Actions) */}
-                      {message.role === "assistant" && 
-                       message.id && 
-                       !(isLoading && index === messages.length - 1) && (
-                        <div className="flex items-center gap-1 mt-2 p-1 rounded-lg bg-muted/30 w-fit">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                            onClick={() => copyToClipboard(message.content, message.id!)}
-                            title="コピー"
-                          >
-                            {copiedId === message.id ? (
+                      {message.role === "assistant" &&
+                        message.id &&
+                        !(isLoading && index === messages.length - 1) && (
+                          <div className="flex items-center gap-1 mt-2 p-1 rounded-lg bg-muted/30 w-fit">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                              onClick={() =>
+                                copyToClipboard(message.content, message.id!)
+                              }
+                              title="コピー"
+                            >
+                              {copiedId === message.id ? (
                                 <Check className="h-3.5 w-3.5 text-green-500" />
-                            ) : (
+                              ) : (
                                 <Copy className="h-3.5 w-3.5" />
-                            )}
-                          </Button>
-                          <div className="w-px h-3 bg-border mx-1" />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className={`h-7 w-7 ${
-                              message.feedback === "good"
-                                ? "text-blue-500"
-                                : "text-muted-foreground hover:text-blue-500"
-                            }`}
-                            onClick={() => submitFeedback(message.id!, "good")}
-                            title="高評価"
-                          >
-                            <ThumbsUp className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className={`h-7 w-7 ${
-                              message.feedback === "bad"
-                                ? "text-red-500"
-                                : "text-muted-foreground hover:text-red-500"
-                            }`}
-                            onClick={() => submitFeedback(message.id!, "bad")}
-                            title="低評価"
-                          >
-                            <ThumbsDown className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      )}
+                              )}
+                            </Button>
+                            <div className="w-px h-3 bg-border mx-1" />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className={`h-7 w-7 ${
+                                message.feedback === "good"
+                                  ? "text-blue-500"
+                                  : "text-muted-foreground hover:text-blue-500"
+                              }`}
+                              onClick={() =>
+                                submitFeedback(message.id!, "good")
+                              }
+                              title="高評価"
+                            >
+                              <ThumbsUp className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className={`h-7 w-7 ${
+                                message.feedback === "bad"
+                                  ? "text-red-500"
+                                  : "text-muted-foreground hover:text-red-500"
+                              }`}
+                              onClick={() => submitFeedback(message.id!, "bad")}
+                              title="低評価"
+                            >
+                              <ThumbsDown className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        )}
                     </div>
                   </div>
                 </div>

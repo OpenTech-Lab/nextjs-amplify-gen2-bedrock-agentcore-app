@@ -26,7 +26,19 @@ import {
   PlusCircle,
   MessageSquare,
   Trash2,
+  Settings,
+  Moon,
+  Sun,
+  ChevronUp,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useTheme } from "next-themes";
 
 interface AppSidebarProps {
   onNewChat: () => void;
@@ -36,35 +48,45 @@ interface AppSidebarProps {
 
 const client = generateClient<Schema>();
 
-export default function AppSidebar({ onNewChat, onSelectSession, currentSessionId }: AppSidebarProps) {
+export default function AppSidebar({
+  onNewChat,
+  onSelectSession,
+  currentSessionId,
+}: AppSidebarProps) {
   const { user, signOut } = useAuthenticator();
   const { setOpenMobile } = useSidebar();
-  const [sessions, setSessions] = useState<Array<Schema["ChatSession"]["type"]>>([]);
+  const { theme, setTheme } = useTheme();
+  const [sessions, setSessions] = useState<
+    Array<Schema["ChatSession"]["type"]>
+  >([]);
 
-  const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
+  const handleDeleteSession = async (
+    sessionId: string,
+    e: React.MouseEvent
+  ) => {
     e.stopPropagation();
-    
+
     if (!confirm("この会話を削除してもよろしいですか？")) return;
-    
+
     try {
       // Delete all messages in this session
       const { data: messages } = await client.models.Message.list({
-        filter: { sessionId: { eq: sessionId } }
+        filter: { sessionId: { eq: sessionId } },
       });
-      
+
       for (const msg of messages) {
         await client.models.Message.delete({ id: msg.id });
       }
-      
+
       // Delete the session
       const { data: sessionsToDelete } = await client.models.ChatSession.list({
-        filter: { sessionId: { eq: sessionId } }
+        filter: { sessionId: { eq: sessionId } },
       });
-      
+
       for (const sess of sessionsToDelete) {
         await client.models.ChatSession.delete({ id: sess.id });
       }
-      
+
       // If currently viewing this session, trigger new chat
       if (currentSessionId === sessionId) {
         onNewChat();
@@ -77,19 +99,20 @@ export default function AppSidebar({ onNewChat, onSelectSession, currentSessionI
 
   useEffect(() => {
     if (!user) return;
-    
+
     // Subscribe to session updates
     const sub = client.models.ChatSession.observeQuery().subscribe({
-        next: ({ items }) => {
-            // Sort by updatedAt descending (manually for now as observeQuery sort might be tricky with just updatedAt)
-            // Actually, we can assume create order or manual sort.
-            // Let's sort by createdAt desc if possible, or filtered.
-            // For now just reverse items or sort by updatedAt if available.
-            const sorted = [...items].sort((a, b) => 
-                new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-            );
-            setSessions(sorted);
-        }
+      next: ({ items }) => {
+        // Sort by updatedAt descending (manually for now as observeQuery sort might be tricky with just updatedAt)
+        // Actually, we can assume create order or manual sort.
+        // Let's sort by createdAt desc if possible, or filtered.
+        // For now just reverse items or sort by updatedAt if available.
+        const sorted = [...items].sort(
+          (a, b) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+        setSessions(sorted);
+      },
     });
     return () => sub.unsubscribe();
   }, [user]);
@@ -139,14 +162,16 @@ export default function AppSidebar({ onNewChat, onSelectSession, currentSessionI
                   <div className="flex items-center gap-1 w-full group">
                     <SidebarMenuButton
                       onClick={() => {
-                          onSelectSession(session.sessionId);
-                          setOpenMobile(false);
+                        onSelectSession(session.sessionId);
+                        setOpenMobile(false);
                       }}
                       isActive={currentSessionId === session.sessionId}
                       className="truncate flex-1"
                     >
                       <MessageSquare className="w-4 h-4 shrink-0" />
-                      <span className="truncate">{session.name || "Untitled"}</span>
+                      <span className="truncate">
+                        {session.name || "Untitled"}
+                      </span>
                     </SidebarMenuButton>
                     <Button
                       variant="ghost"
@@ -160,9 +185,9 @@ export default function AppSidebar({ onNewChat, onSelectSession, currentSessionI
                 </SidebarMenuItem>
               ))}
               {sessions.length === 0 && (
-                  <div className="px-4 py-2 text-xs text-muted-foreground">
-                      履歴はありません
-                  </div>
+                <div className="px-4 py-2 text-xs text-muted-foreground">
+                  履歴はありません
+                </div>
               )}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -170,32 +195,63 @@ export default function AppSidebar({ onNewChat, onSelectSession, currentSessionI
       </SidebarContent>
 
       <SidebarFooter className="border-t p-3">
-        {/* User Profile */}
-        <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-sidebar-accent transition-colors">
-          <Avatar className="w-9 h-9 bg-gradient-to-br from-blue-500 to-purple-600">
-            <AvatarFallback className="bg-transparent text-white text-sm">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium truncate">{username}</div>
-            <div className="text-xs text-muted-foreground flex items-center gap-1">
-              <User className="w-3 h-3" />
-              オンライン
-            </div>
-          </div>
-        </div>
-
-        {/* Logout Button */}
-        <Button
-          onClick={signOut}
-          variant="ghost"
-          size="sm"
-          className="w-full gap-2 text-muted-foreground hover:text-destructive"
-        >
-          <LogOut className="w-4 h-4" />
-          ログアウト
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-sidebar-accent transition-colors justify-between h-auto"
+            >
+              <div className="flex items-center gap-3">
+                <Avatar className="w-9 h-9 bg-gradient-to-br from-blue-500 to-purple-600">
+                  <AvatarFallback className="bg-transparent text-white text-sm">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0 text-left">
+                  <div className="text-sm font-medium truncate">{username}</div>
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <User className="w-3 h-3" />
+                    オンライン
+                  </div>
+                </div>
+              </div>
+              <ChevronUp className="w-4 h-4 text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align="end" className="w-56">
+            <DropdownMenuItem
+              onClick={() => {
+                /* Add settings handler */
+              }}
+            >
+              <Settings className="w-4 h-4 mr-2" />
+              設定
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            >
+              {theme === "dark" ? (
+                <>
+                  <Sun className="w-4 h-4 mr-2" />
+                  ライトモード
+                </>
+              ) : (
+                <>
+                  <Moon className="w-4 h-4 mr-2" />
+                  ダークモード
+                </>
+              )}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={signOut}
+              className="text-destructive focus:text-destructive"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              ログアウト
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </SidebarFooter>
     </Sidebar>
   );
