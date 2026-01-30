@@ -3,9 +3,13 @@ import {
   InvokeAgentRuntimeCommand,
 } from "@aws-sdk/client-bedrock-agentcore";
 import { fromNodeProviderChain } from "@aws-sdk/credential-providers";
-import { UIMessage } from "ai";
 
 export const maxDuration = 30;
+
+interface Message {
+  role: string;
+  content: string;
+}
 
 const client = new BedrockAgentCoreClient({
   region: "ap-northeast-1",
@@ -22,19 +26,14 @@ export async function POST(req: Request) {
     const {
       messages,
     }: {
-      messages: UIMessage[];
+      messages: Message[];
     } = await req.json();
 
     console.log("Received request with messages:", messages);
 
     // Convert messages to AgentCore format (last message is the user input)
     const lastMessage = messages[messages.length - 1];
-    const inputText =
-      typeof lastMessage.content === "string"
-        ? lastMessage.content
-        : lastMessage.content
-            .map((part) => (part.type === "text" ? part.text : ""))
-            .join("");
+    const inputText = lastMessage.content;
 
     console.log("Input text:", inputText);
 
@@ -79,7 +78,9 @@ export async function POST(req: Request) {
 
           if (outputStream) {
             let chunkCount = 0;
-            for await (const chunk of outputStream) {
+            // Type assertion to iterate over the async iterable
+            const asyncIterable = outputStream as AsyncIterable<Uint8Array>;
+            for await (const chunk of asyncIterable) {
               chunkCount++;
 
               // The chunk is a Uint8Array, decode it to string

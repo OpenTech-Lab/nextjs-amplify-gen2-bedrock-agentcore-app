@@ -3,6 +3,11 @@
 .env
 .playwright-mcp
 
+# agentcore
+.bedrock_agentcore.yaml
+.bedrock_agentcore
+launch.log
+
 # dependencies
 /node_modules
 /.pnp
