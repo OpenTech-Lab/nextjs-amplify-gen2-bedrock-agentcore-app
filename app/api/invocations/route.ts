@@ -32,8 +32,9 @@ export async function POST(req: Request) {
     console.log("Received request with messages:", messages);
 
     // Initialize client inside handler to ensure fresh credentials
+    const region = process.env.AWS_REGION || "ap-northeast-1";
     const client = new BedrockAgentCoreClient({
-      region: "ap-northeast-1",
+      region,
       credentials: fromNodeProviderChain(),
     });
 
