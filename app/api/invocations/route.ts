@@ -33,9 +33,28 @@ export async function POST(req: Request) {
 
     // Initialize client inside handler to ensure fresh credentials
     const region = process.env.AWS_REGION || "ap-northeast-1";
+
+    // Check for credentials in headers (proxy from client)
+    const accessKeyId = req.headers.get("x-access-key-id");
+    const secretAccessKey = req.headers.get("x-secret-access-key");
+    const sessionToken = req.headers.get("x-session-token");
+
+    let credentials;
+    if (accessKeyId && secretAccessKey) {
+        console.log("Using credentials from request headers");
+        credentials = {
+            accessKeyId,
+            secretAccessKey,
+            sessionToken: sessionToken || undefined,
+        };
+    } else {
+        console.log("Using default credential provider chain");
+        credentials = fromNodeProviderChain();
+    }
+
     const client = new BedrockAgentCoreClient({
       region,
-      credentials: fromNodeProviderChain(),
+      credentials,
     });
 
     // Convert messages to AgentCore format (last message is the user input)

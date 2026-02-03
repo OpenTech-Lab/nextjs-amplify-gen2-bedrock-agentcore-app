@@ -170,6 +170,10 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
       console.log("Sending request to backend API...");
 
       try {
+        // Fetch current credentials
+        const session = await fetchAuthSession();
+        const creds = session.credentials;
+
         // Use backend API endpoint
         const requestBody = {
           messages: [
@@ -178,12 +182,23 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
           ],
         };
 
+        const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+        };
+
+        // Pass credentials if available
+        if (creds) {
+            headers["x-access-key-id"] = creds.accessKeyId;
+            headers["x-secret-access-key"] = creds.secretAccessKey;
+            if (creds.sessionToken) {
+                headers["x-session-token"] = creds.sessionToken;
+            }
+        }
+
         // Send request to backend
         const response = await fetch("/api/invocations", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers,
           body: JSON.stringify(requestBody),
         });
 
