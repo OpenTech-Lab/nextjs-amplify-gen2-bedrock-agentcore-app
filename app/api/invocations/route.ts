@@ -15,14 +15,14 @@ interface Message {
 // const client = new BedrockAgentCoreClient({ ... });
 
 // AgentCore runtime ARN
-const RUNTIME_ARN = process.env.RUNTIME_ARN;
-
-if (!RUNTIME_ARN) {
-  throw new Error("RUNTIME_ARN environment variable is not defined");
-}
+const CLIENT_AGENT_ARN = process.env.NEXT_PUBLIC_AGENT_ARN;
 
 export async function POST(req: Request) {
   try {
+    if (!CLIENT_AGENT_ARN) {
+      throw new Error("NEXT_PUBLIC_AGENT_ARN environment variable is not defined");
+    }
+
     const {
       messages,
     }: {
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
 
     console.log(
       "Invoking AgentCore runtime:",
-      RUNTIME_ARN,
+      CLIENT_AGENT_ARN,
       "with sessionId:",
       runtimeSessionId
     );
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
     });
 
     const command = new InvokeAgentRuntimeCommand({
-      agentRuntimeArn: RUNTIME_ARN,
+      agentRuntimeArn: CLIENT_AGENT_ARN,
       runtimeSessionId,
       payload: Buffer.from(payload),
       contentType: "application/json",
