@@ -3,8 +3,16 @@ import { useAuth } from "./useAuth";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "@/amplify/data/resource";
+import {
+  BedrockAgentCoreClient,
+  InvokeAgentRuntimeCommand,
+} from "@aws-sdk/client-bedrock-agentcore";
 
 const client = generateClient<Schema>();
+
+// AgentCore runtime ARN
+const CLIENT_AGENT_ARN = process.env.NEXT_PUBLIC_AGENT_ARN;
+const AWS_REGION = process.env.NEXT_PUBLIC_AWS_REGION || "ap-northeast-1";
 
 /**
  * SSEチャット機能のオプション設定
@@ -168,154 +176,146 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
         }
       }
 
-      console.log("Sending request to backend API...");
+      console.log("Sending request to AgentCore via SDK...");
 
       try {
+        if (!CLIENT_AGENT_ARN) {
+            throw new Error("NEXT_PUBLIC_AGENT_ARN environment variable is not defined");
+        }
+
         // Fetch current credentials
         const session = await fetchAuthSession();
         const creds = session.credentials;
 
-        // Use backend API endpoint
-        const requestBody = {
-          messages: [
-            ...messages.filter((msg) => !msg.id || msg.id),
-            { role: "user", content: prompt },
-          ],
-        };
-
-        const headers: Record<string, string> = {
-            "Content-Type": "application/json",
-        };
-
-        // Pass credentials if available
-        if (creds) {
-            headers["x-access-key-id"] = creds.accessKeyId;
-            headers["x-secret-access-key"] = creds.secretAccessKey;
-            if (creds.sessionToken) {
-                headers["x-session-token"] = creds.sessionToken;
-            }
+        if (!creds) {
+            throw new Error("Failed to get AWS credentials");
         }
 
-        // Send request to backend
-        const response = await fetch("/api/invocations", {
-          method: "POST",
-          headers,
-          body: JSON.stringify(requestBody),
+        const agentCoreClient = new BedrockAgentCoreClient({
+            region: AWS_REGION,
+            credentials: creds,
         });
 
-        console.log("Response status:", response.status);
+        const inputText = messages.length > 0 
+            ? `${messages.map(m => `${m.role}: ${m.content}`).join("\n")}\nuser: ${prompt}` 
+            : prompt;
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.log("Error response body:", errorText);
+        // Generate session ID (must be >= 33 chars) - use the chat session Id if possible or generate one for runtime?
+        // Runtime requires session ID to persist context.
+        // We can reuse sessionId passed to the hook, but it needs to be formatted?
+        // AgentCore runtime session ID requirements might differ. 
+        // Let's generate one per turn or use persistent one? 
+        // Python code uses random generation. Let's use sessionId if it fits.
+        // But sessionId from hook might be UUID from somewhere else.
+        // Let's create a runtime session ID that persists for the *hook* lifecycle or derive it.
+        // For now, let's keep it simple and generate one per request like previous route (stateless HTTP), 
+        // BUT wait, route.ts was "stateless" per HTTP request but agentcore runtime *has* state?
+        // The previous python agent implementation: "agent_stream = current_agent.stream_async(user_prompt)" 
+        // And strands.Helper likely manages history if session ID is provided.
+        // The previous route.ts generated a NEW runtimeSessionId for EACH request:
+        /*
+        const runtimeSessionId = `session-${Date.now()}-${Math.random()
+          .toString(36)
+          .substring(2, 15)}-${Math.random().toString(36).substring(2, 15)}`;
+        */
+       // So it was effectively stateless? Or AgentCore preserves it?
+       // If we want conversation history, we should probably keep the session ID consistent?
+       // But let's replicate the route.ts behavior first.
+        const runtimeSessionId = `session-${Date.now()}-${Math.random()
+            .toString(36)
+            .substring(2, 15)}-${Math.random().toString(36).substring(2, 15)}`;
 
-          let errorData;
-          try {
-            errorData = JSON.parse(errorText);
-          } catch {
-            errorData = { error: errorText || "Unknown error" };
-          }
+        const payload = JSON.stringify({
+            prompt: inputText,
+        });
 
-          const msg =
-            errorData.error ||
-            errorData.message ||
-            `HTTP ${response.status}: ${response.statusText || errorText}`;
-          throw new Error(msg);
-        }
+        const command = new InvokeAgentRuntimeCommand({
+            agentRuntimeArn: CLIENT_AGENT_ARN,
+            runtimeSessionId,
+            payload: new TextEncoder().encode(payload),
+            contentType: "application/json",
+            accept: "application/json",
+        });
+
+        const response = await agentCoreClient.send(command);
+        console.log("AgentCore response received");
 
         // Handle SSE streaming response from AgentCore
-        const reader = response.body?.getReader();
-        if (!reader) {
-          throw new Error("Response body is not readable");
+        // response.response is the stream
+        const outputStream = response.response;
+        if (!outputStream) {
+             throw new Error("No output stream found in response");
         }
 
-        const decoder = new TextDecoder();
-        let buffer = "";
         let aiResponseAccumulator = "";
+        const decoder = new TextDecoder();
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-
-          // Process complete lines (SSE format)
-          let newlineIndex;
-          while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
-            const line = buffer.slice(0, newlineIndex).trim();
-            buffer = buffer.slice(newlineIndex + 1);
-
-            if (!line) continue;
-
-            // Parse SSE data
-            if (line.startsWith("data: ")) {
-              const data = line.slice(6).trim();
-
-              if (data === "[DONE]") {
-                console.log("Stream completed");
-                break;
-              }
-
-              let parsed;
-              try {
-                parsed = JSON.parse(data);
-                console.log("Received chunk:", JSON.stringify(parsed, null, 2));
-              } catch (parseError) {
-                console.error(
-                  "JSON parse error:",
-                  parseError,
-                  "for data:",
-                  data
-                );
-                continue;
-              }
-
-              // Handle error messages from the stream
-              if (parsed.error) {
-                throw new Error(parsed.error);
-              }
-
-              // AgentCore format: {"event": {"contentBlockDelta": {"delta": {"text": "..."}}}}
-              if (
-                parsed.event &&
-                parsed.event.contentBlockDelta &&
-                parsed.event.contentBlockDelta.delta
-              ) {
-                const text = parsed.event.contentBlockDelta.delta.text;
-                if (text) {
-                  aiResponseAccumulator += text;
-
-                  setMessages((prev) => {
-                    const newMessages = [...prev];
-                    const lastMessageIndex = newMessages.length - 1;
-                    const lastMessage = { ...newMessages[lastMessageIndex] };
-
-                    if (lastMessage.role === "assistant") {
-                      lastMessage.content = aiResponseAccumulator;
-                      newMessages[lastMessageIndex] = lastMessage;
-                    }
-                    return newMessages;
-                  });
-                }
-              }
-
-              // Handle message start
-              if (parsed.event && parsed.event.messageStart) {
-                console.log(
-                  "Message start, role:",
-                  parsed.event.messageStart.role
-                );
-              }
-
-              // Handle message stop
-              if (parsed.event && parsed.event.messageStop) {
-                console.log(
-                  "Message stopped, reason:",
-                  parsed.event.messageStop.stopReason
-                );
-              }
+        // Type assertion to iterate over the async iterable
+        const asyncIterable = outputStream as AsyncIterable<Uint8Array>;
+        for await (const chunk of asyncIterable) {
+            let chunkStr = "";
+            if (chunk instanceof Uint8Array) {
+                chunkStr = decoder.decode(chunk);
+            } else if (typeof chunk === "string") {
+                chunkStr = chunk;
+            } else {
+                 chunkStr = JSON.stringify(chunk); // Should not happen for configured SDK
             }
-          }
+            
+            // The chunk from SDK might NOT be "data: ..." formatted strings if using SDK?
+            // Wait, previous route.ts was manually decoding chunks and ENQUEUEING them to SSE controller.
+            // But what does SDK return as payload? 
+            // The "response" field in InvokeAgentRuntimeCommandOutput is: "response?: AsyncIterable<Uint8Array> | undefined"
+            // The underlying service returns an Event Stream or just a stream of bytes?
+            // In route.ts: "chunkStr = decoder.decode(chunk);" and then log it. 
+            // The route.ts was then wrapping it in `controller.enqueue(...)` effectively passing it through.
+            // The output from AgentCore Runtime IS ALREADY SSE-formatted text?
+            // "data: {"event": ...}"
+            
+            // Yes, checking current logs: 
+            // "data: {"event": {"messageStart": ...}}"
+            // So we need to parse this SSE format manually here too.
+
+            const lines = chunkStr.split("\n");
+            for (const line of lines) {
+                 if (!line || !line.trim()) continue;
+                 
+                 if (line.startsWith("data: ")) {
+                     const data = line.slice(6).trim();
+                     if (data === "[DONE]") continue;
+
+                     try {
+                         const parsed = JSON.parse(data);
+                         
+                         if (parsed.error) throw new Error(parsed.error);
+
+                         if (
+                            parsed.event &&
+                            parsed.event.contentBlockDelta &&
+                            parsed.event.contentBlockDelta.delta
+                          ) {
+                            const text = parsed.event.contentBlockDelta.delta.text;
+                            if (text) {
+                              aiResponseAccumulator += text;
+            
+                              setMessages((prev) => {
+                                const newMessages = [...prev];
+                                const lastMessageIndex = newMessages.length - 1;
+                                const lastMessage = { ...newMessages[lastMessageIndex] };
+            
+                                if (lastMessage.role === "assistant") {
+                                  lastMessage.content = aiResponseAccumulator;
+                                  newMessages[lastMessageIndex] = lastMessage;
+                                }
+                                return newMessages;
+                              });
+                            }
+                          }
+                     } catch (e) {
+                         console.error("Error parsing SSE chunk", e);
+                     }
+                 }
+            }
         }
 
         // Update message with AI response after stream completes
@@ -332,6 +332,7 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
       } catch (fetchError) {
         const errorMessage =
           fetchError instanceof Error ? fetchError.message : "Unknown error";
+        console.error("Invocation error:", fetchError);
         const isClientInitError =
           typeof errorMessage === "string" &&
           errorMessage.toLowerCase().includes("client initialization failed");
@@ -349,7 +350,7 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
         setIsLoading(false);
       }
     },
-    [getAuthTokens, maxRetries, retryDelay, sessionId, messages.length] // Added specific dependencies
+    [maxRetries, retryDelay, sessionId, messages] // Removed getAuthTokens as we use fetchAuthSession
   );
 
   /**
