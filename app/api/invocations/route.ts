@@ -11,15 +11,15 @@ interface Message {
   content: string;
 }
 
-const client = new BedrockAgentCoreClient({
-  region: "ap-northeast-1",
-  credentials: fromNodeProviderChain(),
-});
+// Client is initialized inside the handler to ensure fresh credentials
+// const client = new BedrockAgentCoreClient({ ... });
 
 // AgentCore runtime ARN
-const RUNTIME_ARN =
-  process.env.RUNTIME_ARN ||
-  "arn:aws:bedrock-agentcore:ap-northeast-1:832780067678:runtime/mcp_agent_gen2-T26lUt3pz9";
+const RUNTIME_ARN = process.env.RUNTIME_ARN;
+
+if (!RUNTIME_ARN) {
+  throw new Error("RUNTIME_ARN environment variable is not defined");
+}
 
 export async function POST(req: Request) {
   try {
@@ -30,6 +30,12 @@ export async function POST(req: Request) {
     } = await req.json();
 
     console.log("Received request with messages:", messages);
+
+    // Initialize client inside handler to ensure fresh credentials
+    const client = new BedrockAgentCoreClient({
+      region: "ap-northeast-1",
+      credentials: fromNodeProviderChain(),
+    });
 
     // Convert messages to AgentCore format (last message is the user input)
     const lastMessage = messages[messages.length - 1];
