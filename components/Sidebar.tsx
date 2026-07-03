@@ -39,6 +39,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from "next-themes";
+import { useGuestMode } from "@/components/AuthProvider";
 
 interface AppSidebarProps {
   onNewChat: () => void;
@@ -54,6 +55,7 @@ export default function AppSidebar({
   currentSessionId,
 }: AppSidebarProps) {
   const { user, signOut } = useAuthenticator();
+  const { isGuest, exitGuestMode } = useGuestMode();
   const { setOpenMobile } = useSidebar();
   const { theme, setTheme } = useTheme();
   const [sessions, setSessions] = useState<
@@ -117,7 +119,9 @@ export default function AppSidebar({
     return () => sub.unsubscribe();
   }, [user]);
 
-  const username = user?.signInDetails?.loginId || user?.username || "User";
+  const username = isGuest
+    ? "Guest"
+    : user?.signInDetails?.loginId || user?.username || "User";
   const initials = username
     .split(" ")
     .map((n) => n[0])
@@ -186,7 +190,9 @@ export default function AppSidebar({
               ))}
               {sessions.length === 0 && (
                 <div className="px-4 py-2 text-xs text-muted-foreground">
-                  No history
+                  {isGuest
+                    ? "Guest chats aren't saved. Sign in to keep history."
+                    : "No history"}
                 </div>
               )}
             </SidebarMenu>
@@ -211,7 +217,7 @@ export default function AppSidebar({
                   <div className="text-sm font-medium truncate">{username}</div>
                   <div className="text-xs text-muted-foreground flex items-center gap-1">
                     <User className="w-3 h-3" />
-                    Online
+                    {isGuest ? "Guest session" : "Online"}
                   </div>
                 </div>
               </div>
@@ -243,11 +249,11 @@ export default function AppSidebar({
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={signOut}
+              onClick={isGuest ? exitGuestMode : signOut}
               className="text-destructive focus:text-destructive"
             >
               <LogOut className="w-4 h-4 mr-2" />
-              Logout
+              {isGuest ? "Exit Guest Mode" : "Logout"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

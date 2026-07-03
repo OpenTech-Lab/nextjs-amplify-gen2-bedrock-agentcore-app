@@ -9,6 +9,13 @@ const backend = defineBackend({
   data,
 });
 
+// Allow guest/unauthenticated identities from the Identity Pool, so the
+// website's "Continue as Guest" flow can get real (unauthenticated-role)
+// AWS credentials without signing in. See amplify/auth/resource.ts and
+// components/AuthProvider.tsx for the rest of the guest-mode wiring.
+backend.auth.resources.cfnResources.cfnIdentityPool.allowUnauthenticatedIdentities =
+  true;
+
 const agentRuntimeArnPrefix = `arn:aws:bedrock-agentcore:${Aws.REGION}:${Aws.ACCOUNT_ID}:runtime/mcpAgentGen2_MyAgent`;
 
 const bedrockAgentCorePolicy = new PolicyStatement({

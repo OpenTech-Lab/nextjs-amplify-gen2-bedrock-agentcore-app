@@ -6,6 +6,7 @@ import { useAuthenticator } from "@aws-amplify/ui-react";
 import { Sparkles, Loader2 } from "lucide-react";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { v4 as uuidv4 } from "uuid";
+import { useGuestMode } from "@/components/AuthProvider";
 
 // Dynamic import to avoid SSR issues
 const AppSidebar = dynamic(() => import("@/components/Sidebar"), {
@@ -17,6 +18,7 @@ const ChatComponent = dynamic(() => import("@/components/ChatComponent"), {
 
 export default function Home() {
   const { user } = useAuthenticator();
+  const { isGuest } = useGuestMode();
   // Manage current session ID
   const [currentSessionId, setCurrentSessionId] = useState("");
 
@@ -44,8 +46,8 @@ export default function Home() {
     localStorage.setItem("lastActiveSessionId", sessionId);
   }, []);
 
-  // 認証済みの場合はチャット画面を表示
-  if (user) {
+  // 認証済み、またはゲストモードの場合はチャット画面を表示
+  if (user || isGuest) {
     return (
       <SidebarProvider>
         <AppSidebar 
