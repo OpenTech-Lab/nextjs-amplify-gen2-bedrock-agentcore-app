@@ -1,0 +1,7 @@
+main.py
+pyproject.toml
+mcp_agent_gen2.egg-info/PKG-INFO
+mcp_agent_gen2.egg-info/SOURCES.txt
+mcp_agent_gen2.egg-info/dependency_links.txt
+mcp_agent_gen2.egg-info/requires.txt
+mcp_agent_gen2.egg-info/top_level.txt

@@ -29,6 +29,45 @@ export interface Message {
   feedback?: "good" | "bad";
 }
 
+/** Tool ids the backend agent (agentcore/mcpAgentGen2/app/main.py) knows how to enable. */
+export const AVAILABLE_TOOLS = [
+  {
+    id: "aws_documentation",
+    label: "AWS Documentation",
+    description:
+      "Search and read official AWS documentation pages (docs.aws.amazon.com) for accurate, up-to-date service details.",
+  },
+  {
+    id: "aws_knowledge",
+    label: "AWS Knowledge",
+    description:
+      "Query AWS's broader knowledge base: What's New posts, blog posts, architecture guidance, and regional/API availability.",
+  },
+  {
+    id: "calculator",
+    label: "Calculator",
+    description: "Evaluate mathematical expressions precisely instead of guessing.",
+  },
+  {
+    id: "current_time",
+    label: "Current Time",
+    description: "Look up the current date/time instead of relying on training data.",
+  },
+  {
+    id: "http_request",
+    label: "Web Request",
+    description: "Fetch content from a URL, e.g. to read a web page the user links to.",
+  },
+] as const;
+
+export type ToolId = (typeof AVAILABLE_TOOLS)[number]["id"];
+
+/** Live status of the agent while a response is streaming in. */
+export type AgentStatus =
+  | { type: "thinking" }
+  | { type: "tool_use"; name: string }
+  | null;
+
 /**
  * SSE（Server-Sent Events）を使用したチャット機能のカスタムフック
  *
@@ -42,6 +81,13 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Which tools/MCP servers the agent is allowed to use. Defaults to all.
+  const [selectedTools, setSelectedTools] = useState<ToolId[]>(
+    AVAILABLE_TOOLS.map((t) => t.id)
+  );
+  // "Thinking..." / "Using tool: X" indicator, derived from the raw Bedrock
+  // Converse stream events (messageStart / contentBlockStart / contentBlockDelta).
+  const [agentStatus, setAgentStatus] = useState<AgentStatus>(null);
   // Session ID Management (Handled externally now)
   // const [sessionId] = useState(...) -> Removed
 
@@ -118,6 +164,7 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
 
       setIsLoading(true);
       setError(null);
+      setAgentStatus({ type: "thinking" });
 
       // Add user message immediately only on first attempt
       if (retryCount === 0) {
@@ -227,6 +274,7 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
 
         const payload = JSON.stringify({
             prompt: inputText,
+            tools: selectedTools,
         });
 
         const command = new InvokeAgentRuntimeCommand({
@@ -289,20 +337,33 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
                          
                          if (parsed.error) throw new Error(parsed.error);
 
-                         if (
-                            parsed.event &&
-                            parsed.event.contentBlockDelta &&
-                            parsed.event.contentBlockDelta.delta
-                          ) {
-                            const text = parsed.event.contentBlockDelta.delta.text;
+                         const event = parsed.event;
+                         if (event?.messageStart) {
+                           // Model has started composing a turn, no tokens yet.
+                           setAgentStatus({ type: "thinking" });
+                         } else if (event?.contentBlockStart?.start?.toolUse) {
+                           // Model is about to call a tool.
+                           setAgentStatus({
+                             type: "tool_use",
+                             name: event.contentBlockStart.start.toolUse.name,
+                           });
+                         } else if (event?.messageStop) {
+                           setAgentStatus(null);
+                         }
+
+                         if (event?.contentBlockDelta?.delta) {
+                            const text = event.contentBlockDelta.delta.text;
                             if (text) {
+                              // Actual answer text is streaming in, so we're
+                              // no longer "thinking" or mid-tool-call.
+                              setAgentStatus(null);
                               aiResponseAccumulator += text;
-            
+
                               setMessages((prev) => {
                                 const newMessages = [...prev];
                                 const lastMessageIndex = newMessages.length - 1;
                                 const lastMessage = { ...newMessages[lastMessageIndex] };
-            
+
                                 if (lastMessage.role === "assistant") {
                                   lastMessage.content = aiResponseAccumulator;
                                   newMessages[lastMessageIndex] = lastMessage;
@@ -348,9 +409,10 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
         }
       } finally {
         setIsLoading(false);
+        setAgentStatus(null);
       }
     },
-    [maxRetries, retryDelay, sessionId, messages] // Removed getAuthTokens as we use fetchAuthSession
+    [maxRetries, retryDelay, sessionId, messages, selectedTools] // Removed getAuthTokens as we use fetchAuthSession
   );
 
   /**
@@ -389,6 +451,9 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
     messages, // メッセージ履歴
     isLoading, // 送信中フラグ
     error, // エラーメッセージ
+    agentStatus, // "thinking" / "using tool X" ライブステータス
+    selectedTools, // 有効なツールのid一覧
+    setSelectedTools, // ツール選択を更新する関数
     sendMessage, // メッセージ送信関数
     clearMessages, // 履歴クリア関数
     submitFeedback, // フィードバック送信関数

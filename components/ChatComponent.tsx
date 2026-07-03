@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useSSEChat } from "@/hooks/useSSEChat";
+import { useSSEChat, AVAILABLE_TOOLS, type ToolId } from "@/hooks/useSSEChat";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,8 +17,23 @@ import {
   ThumbsDown,
   Copy,
   Check,
+  Wrench,
 } from "lucide-react";
 import { Badge } from "./ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./ui/tooltip";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { v4 as uuidv4 } from "uuid";
@@ -33,8 +48,31 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { messages, sendMessage, isLoading, error, submitFeedback } =
-    useSSEChat(sessionId);
+  const {
+    messages,
+    sendMessage,
+    isLoading,
+    error,
+    submitFeedback,
+    agentStatus,
+    selectedTools,
+    setSelectedTools,
+  } = useSSEChat(sessionId);
+
+  const toggleTool = (toolId: ToolId) => {
+    setSelectedTools((prev) =>
+      prev.includes(toolId)
+        ? prev.filter((id) => id !== toolId)
+        : [...prev, toolId]
+    );
+  };
+
+  const statusLabel =
+    agentStatus?.type === "tool_use"
+      ? `Using ${agentStatus.name.replace(/^aws___/, "").replace(/_/g, " ")}`
+      : agentStatus?.type === "thinking"
+      ? "Thinking..."
+      : "Responding...";
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -86,7 +124,7 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
           {isLoading ? (
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-              <span className="hidden sm:inline">Responding...</span>
+              <span className="hidden sm:inline">{statusLabel}</span>
             </div>
           ) : error ? (
             <div className="flex items-center gap-1.5 text-destructive">
@@ -100,6 +138,45 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
             </div>
           )}
         </Badge>
+
+        {/* Tool / MCP server picker */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-auto h-8 gap-1.5 text-xs rounded-full"
+            >
+              <Wrench className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Tools</span>
+              <Badge className="h-4 min-w-4 px-1 justify-center bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px]">
+                {selectedTools.length}
+              </Badge>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Tools &amp; MCP servers</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <TooltipProvider delayDuration={200}>
+              {AVAILABLE_TOOLS.map((tool) => (
+                <Tooltip key={tool.id}>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuCheckboxItem
+                      checked={selectedTools.includes(tool.id)}
+                      onCheckedChange={() => toggleTool(tool.id)}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      {tool.label}
+                    </DropdownMenuCheckboxItem>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-[220px] text-xs">
+                    {tool.description}
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </TooltipProvider>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Messages Area */}

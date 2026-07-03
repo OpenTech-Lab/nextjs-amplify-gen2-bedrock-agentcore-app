@@ -8,6 +8,7 @@ dependencies = [
     "strands-agents-tools",
     "mcp",
     "fastmcp",
+    "awslabs.aws-documentation-mcp-server",
 ]
 
 [build-system]
