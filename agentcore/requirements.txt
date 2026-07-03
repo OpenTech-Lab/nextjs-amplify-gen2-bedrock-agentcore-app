@@ -1,8 +1,0 @@
-bedrock-agentcore
-strands-agents
-strands-agents-tools
-mcp
-bedrock-agentcore-starter-toolkit
-awslabs.aws_documentation_mcp_server
-fastmcp
-uv

@@ -1,53 +1,52 @@
 # agentcore
 
-Enter OAuth discovery URL:
-https://cognito-idp.{リージョン名}.amazonaws.com/{CognitoのユーザープールID}/.well-known/openid-configuration
+The deployed project lives in `mcpAgentGen2/` (new `@aws/agentcore` npm CLI, CDK-based). Run all
+`agentcore` commands from `mcpAgentGen2/`.
 
-# agentcore launch --local
+Agent source: `mcpAgentGen2/app/main.py` (Strands agent, Bedrock model). Project config:
+`mcpAgentGen2/agentcore/agentcore.json`, deployment target: `mcpAgentGen2/agentcore/aws-targets.json`.
+
+## OAuth discovery URL (for CUSTOM_JWT authorizer, if configured)
 
 ```
-agentcore configure --entrypoint mcp_agent_gen2.py
-agentcore launch
-agentcore destroy
+https://cognito-idp.{region}.amazonaws.com/{CognitoUserPoolId}/.well-known/openid-configuration
+```
+
+## deploy / invoke
+
+```bash
+cd mcpAgentGen2
+agentcore deploy
+agentcore invoke '{"prompt": "Hello"}'
+agentcore status
+```
+
+## local dev (hot-reload)
+
+```bash
+cd mcpAgentGen2
+agentcore dev
+agentcore invoke --local '{"prompt": "Hello"}'
+```
+
+## check logs
+
+```bash
+cd mcpAgentGen2
+agentcore logs
+```
+
+or directly via CloudWatch (replace the runtime id from `agentcore status`):
+
+```bash
+aws logs tail "/aws/bedrock-agentcore/runtimes/mcpAgentGen2_MyAgent-1L0RoiH7To-DEFAULT" \
+  --region ap-northeast-1 \
+  --follow
 ```
 
 ## remove cache
 
 ```bash
-./reset.sh
-
-agentcore configure --entrypoint mcp_agent_gen2.py
-agentcore launch
-```
-
-```bash
-rm -rf agentcore/.bedrock_agentcore
-rm -rf .pytest_cache __pycache__
-
-docker images | grep bedrock-agentcore-mcp_agent_gen2 || true
-docker rmi -f $(docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' | awk '/bedrock-agentcore-mcp_agent_gen2/ {print $2}') 2>/dev/null || true
-```
-
-## test
-
-```
-agentcore status
-agentcore invoke '{"prompt": "Hello"}'
-```
-
-```
-agentcore launch --local
-agentcore invoke --local '{"prompt": "Hello"}'
-```
-
-## check log
-
-```
-aws logs tail "/aws/bedrock-agentcore/runtimes/mcp_agent_gen2-BozMaOAa8T-DEFAULT" \
-  --log-stream-name-prefix "2025/12/27/[runtime-logs]" \
-  --follow
-
-aws logs tail "/aws/bedrock-agentcore/runtimes/mcp_agent_gen2-BozMaOAa8T-DEFAULT" \
-  --log-stream-name-prefix "2025/12/27/[runtime-logs]" \
-  --since 1h
+rm -rf mcpAgentGen2/agentcore/cdk/cdk.out mcpAgentGen2/agentcore/.cache
+rm -rf .pytest_cache **/__pycache__
 ```

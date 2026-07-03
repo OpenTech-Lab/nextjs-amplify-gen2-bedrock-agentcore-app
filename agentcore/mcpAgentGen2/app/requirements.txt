@@ -1,0 +1,5 @@
+bedrock-agentcore
+strands-agents
+strands-agents-tools
+mcp
+fastmcp

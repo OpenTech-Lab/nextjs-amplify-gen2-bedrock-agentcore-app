@@ -9,9 +9,14 @@ const backend = defineBackend({
   data,
 });
 
+const agentRuntimeArnPrefix = `arn:aws:bedrock-agentcore:${Aws.REGION}:${Aws.ACCOUNT_ID}:runtime/mcpAgentGen2_MyAgent`;
+
 const bedrockAgentCorePolicy = new PolicyStatement({
   actions: ["bedrock-agentcore:InvokeAgentRuntime"],
-  resources: ["*"],
+  resources: [
+    `${agentRuntimeArnPrefix}*`,
+    `${agentRuntimeArnPrefix}*/runtime-endpoint/*`,
+  ],
 });
 
 backend.auth.resources.authenticatedUserIamRole.addToPrincipalPolicy(
