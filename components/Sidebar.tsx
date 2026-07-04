@@ -1,6 +1,5 @@
 "use client";
 
-import { useAuthenticator } from "@aws-amplify/ui-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -39,7 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from "next-themes";
-import { useGuestMode } from "@/components/AuthProvider";
+import { useAppAuth, useGuestMode } from "@/components/AuthProvider";
 
 interface AppSidebarProps {
   onNewChat: () => void;
@@ -54,7 +53,7 @@ export default function AppSidebar({
   onSelectSession,
   currentSessionId,
 }: AppSidebarProps) {
-  const { user, signOut } = useAuthenticator();
+  const { user, signOut } = useAppAuth();
   const { isGuest, exitGuestMode } = useGuestMode();
   const { setOpenMobile } = useSidebar();
   const { theme, setTheme } = useTheme();

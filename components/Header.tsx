@@ -1,12 +1,12 @@
 "use client";
 
-import { useAuthenticator } from "@aws-amplify/ui-react";
+import { useAppAuth } from "@/components/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LogOut, User, Sparkles } from "lucide-react";
 
 export default function Header() {
-  const { user, signOut } = useAuthenticator();
+  const { user, signOut } = useAppAuth();
 
   if (!user) return null;
 

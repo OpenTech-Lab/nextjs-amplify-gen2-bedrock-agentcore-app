@@ -1,10 +1,11 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { Authenticator } from "@aws-amplify/ui-react";
 import { Amplify } from "aws-amplify";
+import { Hub } from "aws-amplify/utils";
+import { getCurrentUser, signOut as amplifySignOut, type AuthUser } from "aws-amplify/auth";
 import outputs from "@/amplify_outputs.json";
-import "@aws-amplify/ui-react/styles.css";
+import LoginForm from "@/components/LoginForm";
 
 Amplify.configure(outputs);
 
@@ -27,16 +28,57 @@ export function useGuestMode() {
   return useContext(GuestModeContext);
 }
 
+interface AppAuthContextValue {
+  user: AuthUser | null;
+  isLoading: boolean;
+  signOut: () => Promise<void>;
+}
+
+const AppAuthContext = createContext<AppAuthContextValue>({
+  user: null,
+  isLoading: true,
+  signOut: async () => {},
+});
+
+/**
+ * Replacement for @aws-amplify/ui-react's useAuthenticator(): same
+ * { user, signOut } shape (user has .userId/.username/.signInDetails), but
+ * backed by our own custom sign-in UI (components/LoginForm.tsx) instead of
+ * the prebuilt <Authenticator> component.
+ */
+export function useAppAuth() {
+  return useContext(AppAuthContext);
+}
+
 export default function AuthProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   // Read localStorage after mount only, to avoid SSR/client markup mismatch.
   const [isGuest, setIsGuest] = useState(false);
 
   useEffect(() => {
     setIsGuest(localStorage.getItem(GUEST_MODE_STORAGE_KEY) === "true");
+
+    const refreshUser = () => {
+      getCurrentUser()
+        .then(setUser)
+        .catch(() => setUser(null))
+        .finally(() => setIsLoading(false));
+    };
+
+    refreshUser();
+
+    const unsubscribe = Hub.listen("auth", ({ payload }) => {
+      if (payload.event === "signedIn" || payload.event === "signedOut") {
+        refreshUser();
+      }
+    });
+
+    return unsubscribe;
   }, []);
 
   const continueAsGuest = () => {
@@ -49,51 +91,37 @@ export default function AuthProvider({
     setIsGuest(false);
   };
 
+  const signOut = async () => {
+    await amplifySignOut();
+    setUser(null);
+  };
+
   const guestModeValue: GuestModeContextValue = {
     isGuest,
     continueAsGuest,
     exitGuestMode,
   };
 
-  // Authenticator.Provider supplies the useAuthenticator() context (used by
-  // app/page.tsx, components/Sidebar.tsx, hooks/useAuth.ts) without forcing
-  // the default sign-in UI, so guests still get a working (empty) auth
-  // context instead of those hooks throwing outside a provider.
+  const authValue: AppAuthContextValue = { user, isLoading, signOut };
+
+  let content: React.ReactNode;
+  if (isLoading) {
+    // Avoid flashing the signed-out login form (or the authenticated app)
+    // before we know whether a session already exists.
+    content = (
+      <div className="min-h-dvh flex items-center justify-center bg-background" />
+    );
+  } else if (user || isGuest) {
+    content = children;
+  } else {
+    content = <LoginForm />;
+  }
+
   return (
-    <Authenticator.Provider>
+    <AppAuthContext.Provider value={authValue}>
       <GuestModeContext.Provider value={guestModeValue}>
-        {isGuest ? (
-          // Guests skip the sign-in UI entirely. fetchAuthSession() will pick
-          // up credentials from the Identity Pool's unauthenticated role
-          // automatically (enabled via allowUnauthenticatedIdentities in
-          // amplify/backend.ts) even with no Cognito user signed in.
-          children
-        ) : (
-          <div className="min-h-screen flex flex-col justify-center items-center bg-background">
-            <Authenticator
-              components={{
-                SignIn: {
-                  Footer() {
-                    return (
-                      <div className="flex justify-center pb-4">
-                        <button
-                          type="button"
-                          onClick={continueAsGuest}
-                          className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
-                        >
-                          Continue as Guest
-                        </button>
-                      </div>
-                    );
-                  },
-                },
-              }}
-            >
-              {children}
-            </Authenticator>
-          </div>
-        )}
+        {content}
       </GuestModeContext.Provider>
-    </Authenticator.Provider>
+    </AppAuthContext.Provider>
   );
 }

@@ -1,9 +1,8 @@
-import { useAuthenticator } from "@aws-amplify/ui-react";
+import { useAppAuth } from "@/components/AuthProvider";
 import { fetchAuthSession, fetchUserAttributes } from "aws-amplify/auth";
 
 export function useAuth() {
-  // useAuthenticatorフックから認証情報を取得
-  const { user, signOut } = useAuthenticator();
+  const { user, signOut } = useAppAuth();
 
   // IDトークンを取得する関数（ユーザー認証用）
   const getIdToken = async () => {

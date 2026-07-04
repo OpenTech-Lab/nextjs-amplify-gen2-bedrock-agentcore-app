@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { useAuthenticator } from "@aws-amplify/ui-react";
+import { useAppAuth } from "@/components/AuthProvider";
 import {
   SidebarProvider,
   SidebarTrigger,
@@ -15,7 +15,7 @@ interface AppLayoutProps {
 }
 
 export default function AppLayout({ children }: AppLayoutProps) {
-  const { user } = useAuthenticator();
+  const { user } = useAppAuth();
   // Manage current session ID
   const [currentSessionId, setCurrentSessionId] = useState("");
 

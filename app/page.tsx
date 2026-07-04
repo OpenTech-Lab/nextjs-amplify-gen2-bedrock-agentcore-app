@@ -2,11 +2,10 @@
 
 import { useState, useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { useAuthenticator } from "@aws-amplify/ui-react";
 import { Sparkles, Loader2 } from "lucide-react";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { v4 as uuidv4 } from "uuid";
-import { useGuestMode } from "@/components/AuthProvider";
+import { useAppAuth, useGuestMode } from "@/components/AuthProvider";
 
 // Dynamic import to avoid SSR issues
 const AppSidebar = dynamic(() => import("@/components/Sidebar"), {
@@ -17,7 +16,7 @@ const ChatComponent = dynamic(() => import("@/components/ChatComponent"), {
 });
 
 export default function Home() {
-  const { user } = useAuthenticator();
+  const { user } = useAppAuth();
   const { isGuest } = useGuestMode();
   // Manage current session ID
   const [currentSessionId, setCurrentSessionId] = useState("");
