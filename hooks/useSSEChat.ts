@@ -57,10 +57,9 @@ export type ToolId = (typeof AVAILABLE_TOOLS)[number]["id"];
 /** Model ids the backend agent (agentcore/mcpAgentGen2/app/main.py) knows how to switch to. */
 export const AVAILABLE_MODELS = [
   {
-    id: "sonnet-5",
-    label: "Claude Sonnet 5",
-    description:
-      "Current default. Anthropic's newest Sonnet — near-Opus intelligence for coding and agentic work at Sonnet pricing.",
+    id: "sonnet-4-6",
+    label: "Claude Sonnet 4.6",
+    description: "Current default. Balanced speed, cost, and intelligence.",
   },
   {
     id: "haiku-4-5",
@@ -70,7 +69,7 @@ export const AVAILABLE_MODELS = [
 ] as const;
 
 export type ModelId = (typeof AVAILABLE_MODELS)[number]["id"];
-const DEFAULT_MODEL_ID: ModelId = "sonnet-5";
+const DEFAULT_MODEL_ID: ModelId = "sonnet-4-6";
 
 /** Live status of the agent while a response is streaming in. */
 export type AgentStatus =
