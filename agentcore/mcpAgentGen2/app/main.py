@@ -1,5 +1,6 @@
 import sys
 from contextlib import ExitStack
+from datetime import datetime, timezone
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from mcp import StdioServerParameters, stdio_client
@@ -34,6 +35,15 @@ AWS documentation/knowledge tools, cite which page(s) you used.
 
 Provide concise answers with only the relevant information.
 """
+
+
+def _build_system_prompt() -> str:
+    """SYSTEM_PROMPT plus dynamic context that must be current per-request
+    (not baked in at cold start), e.g. the actual current date/time - the
+    model's own training data has no knowledge of "today".
+    """
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC (%A)")
+    return f"{SYSTEM_PROMPT}\n\nCurrent date/time: {now}"
 
 # MCP client for the AWS Documentation MCP server (awslabs.aws-documentation-mcp-server).
 # Spawned as a local stdio subprocess using the same Python interpreter/venv this
@@ -110,7 +120,7 @@ def _build_agent(selected_tool_ids: list[str] | None, model_id: str | None) -> A
 
     return Agent(
         model=BedrockModel(model_id=bedrock_model_id),
-        system_prompt=SYSTEM_PROMPT,
+        system_prompt=_build_system_prompt(),
         tools=tools,
     )
 
