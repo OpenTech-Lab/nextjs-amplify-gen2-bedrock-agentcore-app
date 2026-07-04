@@ -18,6 +18,13 @@ frontend:
         - pnpm install --prefer-offline --child-concurrency 1
     build:
       commands:
+        # Amplify Hosting only exposes console/API-configured environment
+        # variables to the build phase, not to the running SSR server, unless
+        # they're NEXT_PUBLIC_-prefixed (Next.js inlines those at build time).
+        # Server-only vars like KNOWLEDGE_BASE_BUCKET need to be written into
+        # .env.production so the deployed server can read them at runtime.
+        # https://docs.aws.amazon.com/amplify/latest/userguide/ssr-environment-variables.html
+        - env | grep -e KNOWLEDGE_BASE_BUCKET >> .env.production
         - pnpm run build
   artifacts:
     baseDirectory: .next
