@@ -62,6 +62,29 @@ export const AVAILABLE_TOOLS = [
 
 export type ToolId = (typeof AVAILABLE_TOOLS)[number]["id"];
 
+/** Model ids the backend agent (agentcore/mcpAgentGen2/app/main.py) knows how to switch to. */
+export const AVAILABLE_MODELS = [
+  {
+    id: "sonnet-4-5",
+    label: "Claude Sonnet 4.5",
+    description: "Current default. Balanced speed, cost, and intelligence.",
+  },
+  {
+    id: "sonnet-5",
+    label: "Claude Sonnet 5",
+    description:
+      "Anthropic's newest Sonnet — near-Opus intelligence for coding and agentic work at Sonnet pricing.",
+  },
+  {
+    id: "haiku-4-5",
+    label: "Claude Haiku 4.5",
+    description: "Fastest and most cost-effective. Best for simple, quick tasks.",
+  },
+] as const;
+
+export type ModelId = (typeof AVAILABLE_MODELS)[number]["id"];
+const DEFAULT_MODEL_ID: ModelId = "sonnet-4-5";
+
 /** Live status of the agent while a response is streaming in. */
 export type AgentStatus =
   | { type: "thinking" }
@@ -85,6 +108,8 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
   const [selectedTools, setSelectedTools] = useState<ToolId[]>(
     AVAILABLE_TOOLS.map((t) => t.id)
   );
+  // Which model the agent should use. Defaults to the current production model.
+  const [selectedModel, setSelectedModel] = useState<ModelId>(DEFAULT_MODEL_ID);
   // "Thinking..." / "Using tool: X" indicator, derived from the raw Bedrock
   // Converse stream events (messageStart / contentBlockStart / contentBlockDelta).
   const [agentStatus, setAgentStatus] = useState<AgentStatus>(null);
@@ -275,6 +300,7 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
         const payload = JSON.stringify({
             prompt: inputText,
             tools: selectedTools,
+            model: selectedModel,
         });
 
         const command = new InvokeAgentRuntimeCommand({
@@ -412,7 +438,7 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
         setAgentStatus(null);
       }
     },
-    [maxRetries, retryDelay, sessionId, messages, selectedTools] // Removed getAuthTokens as we use fetchAuthSession
+    [maxRetries, retryDelay, sessionId, messages, selectedTools, selectedModel] // Removed getAuthTokens as we use fetchAuthSession
   );
 
   /**
@@ -454,6 +480,8 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
     agentStatus, // "thinking" / "using tool X" ライブステータス
     selectedTools, // 有効なツールのid一覧
     setSelectedTools, // ツール選択を更新する関数
+    selectedModel, // 選択中のモデルid
+    setSelectedModel, // モデル選択を更新する関数
     sendMessage, // メッセージ送信関数
     clearMessages, // 履歴クリア関数
     submitFeedback, // フィードバック送信関数

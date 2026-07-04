@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useSSEChat, AVAILABLE_TOOLS, type ToolId } from "@/hooks/useSSEChat";
+import {
+  useSSEChat,
+  AVAILABLE_TOOLS,
+  AVAILABLE_MODELS,
+  type ToolId,
+} from "@/hooks/useSSEChat";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +23,7 @@ import {
   Copy,
   Check,
   Wrench,
+  Sparkles,
 } from "lucide-react";
 import { Badge } from "./ui/badge";
 import {
@@ -25,6 +31,8 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
@@ -57,7 +65,12 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
     agentStatus,
     selectedTools,
     setSelectedTools,
+    selectedModel,
+    setSelectedModel,
   } = useSSEChat(sessionId);
+
+  const selectedModelLabel =
+    AVAILABLE_MODELS.find((m) => m.id === selectedModel)?.label ?? "Model";
 
   const toggleTool = (toolId: ToolId) => {
     setSelectedTools((prev) =>
@@ -139,13 +152,55 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
           )}
         </Badge>
 
-        {/* Tool / MCP server picker */}
+        {/* Model picker */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="outline"
               size="sm"
               className="ml-auto h-8 gap-1.5 text-xs rounded-full"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{selectedModelLabel}</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Model</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <TooltipProvider delayDuration={200}>
+              <DropdownMenuRadioGroup
+                value={selectedModel}
+                onValueChange={(value) =>
+                  setSelectedModel(value as typeof selectedModel)
+                }
+              >
+                {AVAILABLE_MODELS.map((model) => (
+                  <Tooltip key={model.id}>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuRadioItem
+                        value={model.id}
+                        onSelect={(e) => e.preventDefault()}
+                      >
+                        {model.label}
+                      </DropdownMenuRadioItem>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" className="max-w-[220px] text-xs">
+                      {model.description}
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+              </DropdownMenuRadioGroup>
+            </TooltipProvider>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Tool / MCP server picker */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 text-xs rounded-full"
             >
               <Wrench className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Tools</span>

@@ -9,7 +9,15 @@ from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
 from strands_tools import calculator, current_time, http_request
 
-MODEL_ID = "jp.anthropic.claude-sonnet-4-5-20250929-v1:0"
+# Models the frontend can pick from (see AVAILABLE_MODELS in hooks/useSSEChat.ts).
+# Values are Bedrock model/inference-profile IDs. Claude Sonnet 5 has no `jp.`
+# geo cross-region profile yet, so it uses the `global.` profile instead.
+AVAILABLE_MODELS = {
+    "sonnet-4-5": "jp.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    "sonnet-5": "global.anthropic.claude-sonnet-5",
+    "haiku-4-5": "jp.anthropic.claude-haiku-4-5-20251001-v1:0",
+}
+DEFAULT_MODEL_ID = "sonnet-4-5"
 
 app = BedrockAgentCoreApp()
 
@@ -83,12 +91,12 @@ def _get_tool_registry() -> dict[str, list]:
     return _tool_registry
 
 
-def _build_agent(selected_tool_ids: list[str] | None) -> Agent:
-    """Build an Agent scoped to only the requested tool ids.
+def _build_agent(selected_tool_ids: list[str] | None, model_id: str | None) -> Agent:
+    """Build an Agent scoped to only the requested tool ids and model.
 
     Tool objects and the MCP subprocess/session are cached in _tool_registry
     and reused; only this lightweight Agent wrapper is created per request,
-    so letting each request pick its own tool subset stays cheap.
+    so letting each request pick its own tool subset/model stays cheap.
     """
     registry = _get_tool_registry()
     ids = selected_tool_ids if selected_tool_ids else TOOL_IDS
@@ -97,8 +105,10 @@ def _build_agent(selected_tool_ids: list[str] | None) -> Agent:
     for tool_id in ids:
         tools.extend(registry.get(tool_id, []))
 
+    bedrock_model_id = AVAILABLE_MODELS.get(model_id, AVAILABLE_MODELS[DEFAULT_MODEL_ID])
+
     return Agent(
-        model=BedrockModel(model_id=MODEL_ID),
+        model=BedrockModel(model_id=bedrock_model_id),
         system_prompt=SYSTEM_PROMPT,
         tools=tools,
     )
@@ -112,14 +122,17 @@ async def invoke(payload):
       prompt: str - the user's message (required)
       tools: list[str] | None - subset of TOOL_IDS to enable for this turn
         (see TOOL_IDS above); omitted/empty means all tools are enabled.
+      model: str | None - key into AVAILABLE_MODELS to use for this turn;
+        omitted/unknown falls back to DEFAULT_MODEL_ID.
     """
     user_prompt = payload.get(
         "prompt",
         "No prompt found in the input. Please instruct the user to create a JSON payload using the prompt key."
     )
     selected_tools = payload.get("tools")
+    selected_model = payload.get("model")
 
-    current_agent = _build_agent(selected_tools)
+    current_agent = _build_agent(selected_tools, selected_model)
 
     # Stream response from agent
     agent_stream = current_agent.stream_async(user_prompt)
