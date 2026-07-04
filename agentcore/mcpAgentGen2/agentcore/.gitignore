@@ -11,5 +11,7 @@ cdk/node_modules/
 # Ephemeral Staging
 .cache/*
 
-# Exception: Commit the State
-!.cli/deployed-state.json
+# deployed-state.json and aws-targets.json record this account's real AWS
+# account ID, resource ARNs, and role names - kept local-only rather than
+# committed to a public repo (see 2026-07 security review).
+aws-targets.json

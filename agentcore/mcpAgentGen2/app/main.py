@@ -11,10 +11,9 @@ from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
 from strands_tools import calculator, current_time, http_request, retrieve
 
-# Bedrock Knowledge Base for document research (S3 Vectors-backed - see
-# mcpagentgen2-kb-docs-832780067678 / mcpagentgen2-kb-vectors). Upload
-# documents to that S3 bucket and re-sync the data source to make them
-# searchable. strands_tools.retrieve reads these as its defaults.
+# Bedrock Knowledge Base for document research (S3 Vectors-backed). Upload
+# documents to its S3 data source bucket and re-sync the data source to make
+# them searchable. strands_tools.retrieve reads these as its defaults.
 os.environ.setdefault("KNOWLEDGE_BASE_ID", "WIASIAEP4H")
 os.environ.setdefault("AWS_REGION", "ap-northeast-1")
 

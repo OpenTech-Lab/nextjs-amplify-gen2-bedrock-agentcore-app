@@ -3,7 +3,8 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { verifyCognitoCaller } from "@/lib/verify-cognito-caller";
 
 const AWS_REGION = process.env.NEXT_PUBLIC_AWS_REGION || "ap-northeast-1";
-const KNOWLEDGE_BASE_BUCKET = "mcpagentgen2-kb-docs-832780067678";
+// Server-only (no NEXT_PUBLIC_ prefix) so it never reaches the client bundle.
+const KNOWLEDGE_BASE_BUCKET = process.env.KNOWLEDGE_BASE_BUCKET;
 
 // Short-lived: just long enough to open the file, not a durable share link.
 const PRESIGNED_URL_TTL_SECONDS = 300;
@@ -20,6 +21,13 @@ export async function GET(req: Request) {
       status: 401,
       headers: { "Content-Type": "application/json" },
     });
+  }
+
+  if (!KNOWLEDGE_BASE_BUCKET) {
+    return new Response(
+      JSON.stringify({ error: "KNOWLEDGE_BASE_BUCKET environment variable is not defined" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
   }
 
   const { searchParams } = new URL(req.url);

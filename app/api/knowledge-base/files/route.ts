@@ -2,7 +2,8 @@ import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { verifyCognitoCaller } from "@/lib/verify-cognito-caller";
 
 const AWS_REGION = process.env.NEXT_PUBLIC_AWS_REGION || "ap-northeast-1";
-const KNOWLEDGE_BASE_BUCKET = "mcpagentgen2-kb-docs-832780067678";
+// Server-only (no NEXT_PUBLIC_ prefix) so it never reaches the client bundle.
+const KNOWLEDGE_BASE_BUCKET = process.env.KNOWLEDGE_BASE_BUCKET;
 
 /**
  * Lists the documents in the Knowledge Base's S3 bucket, using the Amplify
@@ -16,6 +17,13 @@ export async function GET(req: Request) {
       status: 401,
       headers: { "Content-Type": "application/json" },
     });
+  }
+
+  if (!KNOWLEDGE_BASE_BUCKET) {
+    return new Response(
+      JSON.stringify({ error: "KNOWLEDGE_BASE_BUCKET environment variable is not defined" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
   }
 
   try {
