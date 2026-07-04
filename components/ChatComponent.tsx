@@ -45,6 +45,7 @@ import {
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { v4 as uuidv4 } from "uuid";
+import KnowledgeBaseButton from "@/components/KnowledgeBaseButton";
 
 interface ChatComponentProps {
   sessionId: string;
@@ -232,6 +233,8 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
             </TooltipProvider>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <KnowledgeBaseButton />
       </div>
 
       {/* Messages Area */}
