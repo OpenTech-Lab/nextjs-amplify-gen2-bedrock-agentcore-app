@@ -38,16 +38,16 @@ const getVerifier = (() => {
   };
 })();
 
-// JWTトークンを検証する関数
+// Verifies a JWT token
 export async function verifyJWT(token: string): Promise<boolean> {
   try {
     const verifier = getVerifier();
-    // トークンの署名、有効期限、発行者などを検証
+    // Verifies the token's signature, expiration, issuer, etc.
     const payload = await verifier.verify(token);
-    console.log("JWT検証成功:", payload.sub); // ユーザーID
+    console.log("JWT verification succeeded:", payload.sub); // user id
     return true;
   } catch (error) {
-    logError("JWT検証", error);
+    logError("JWT verification", error);
     return false;
   }
 }

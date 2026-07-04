@@ -1,9 +1,9 @@
 /**
- * エラーハンドリング用のユーティリティ関数
+ * Utility functions for error handling
  */
 
 /**
- * unknown型のエラーからメッセージを安全に取得
+ * Safely extract a message from an unknown error
  */
 export function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -22,7 +22,7 @@ export function getErrorMessage(error: unknown): string {
 }
 
 /**
- * エラーログを統一的に出力
+ * Log errors in a consistent format
  */
 export function logError(context: string, error: unknown): void {
   const message = getErrorMessage(error);
@@ -30,7 +30,7 @@ export function logError(context: string, error: unknown): void {
 }
 
 /**
- * APIエラーの詳細情報を取得
+ * Get detailed information from an API error
  */
 export function getApiErrorDetails(error: unknown): {
   message: string;
@@ -38,7 +38,7 @@ export function getApiErrorDetails(error: unknown): {
   code?: string;
 } {
   if (error instanceof Error) {
-    // Fetch APIのエラーの場合
+    // Fetch API error
     if (error.message.includes("HTTP")) {
       const match = error.message.match(/HTTP (\d+):/);
       const status = match ? parseInt(match[1]) : undefined;

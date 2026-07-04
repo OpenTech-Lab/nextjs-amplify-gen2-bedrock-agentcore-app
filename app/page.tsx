@@ -45,7 +45,7 @@ export default function Home() {
     localStorage.setItem("lastActiveSessionId", sessionId);
   }, []);
 
-  // 認証済み、またはゲストモードの場合はチャット画面を表示
+  // Show the chat screen once authenticated or in guest mode
   if (user || isGuest) {
     return (
       <SidebarProvider>
@@ -62,8 +62,8 @@ export default function Home() {
     );
   }
 
-  // 未認証の場合はウェルカム画面を表示
-  // （AuthProviderが自動的に認証画面を表示）
+  // Otherwise show the welcome screen
+  // (AuthProvider automatically shows the sign-in screen)
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
       <div className="text-center max-w-md">
@@ -76,11 +76,11 @@ export default function Home() {
           </span>
         </h1>
         <p className="text-muted-foreground mb-8 text-sm sm:text-base">
-          ログインしてAIアシスタントとの会話を始めましょう
+          Sign in to start a conversation with the AI Assistant
         </p>
         <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-          <span>認証中...</span>
+          <span>Authenticating...</span>
         </div>
       </div>
     </div>

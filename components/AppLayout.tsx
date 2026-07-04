@@ -43,12 +43,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
     localStorage.setItem("lastActiveSessionId", sessionId);
   }, []);
 
-  // 未認証の場合はchildrenをそのまま表示
+  // Render children as-is when not authenticated
   if (!user) {
     return <>{children}</>;
   }
 
-  // 認証済みの場合はサイドバーレイアウトを適用
+  // Apply the sidebar layout once authenticated
   return (
     <SidebarProvider defaultOpen={true}>
       <AppSidebar 

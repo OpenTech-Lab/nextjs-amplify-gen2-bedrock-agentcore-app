@@ -9,8 +9,8 @@ const geistSans = GeistSans;
 const geistMono = GeistMono;
 
 export const metadata: Metadata = {
-  title: "AI チャットアプリ",
-  description: "AWS Amplify Gen 1を使用したAIチャットアプリケーション",
+  title: "AI Chat App",
+  description: "An AI chat application built with AWS Amplify Gen 2",
 };
 
 export default function RootLayout({
@@ -19,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ja" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

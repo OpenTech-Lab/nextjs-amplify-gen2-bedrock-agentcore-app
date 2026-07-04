@@ -7,11 +7,11 @@ import type { Schema } from "@/amplify/data/resource";
 const client = generateClient<Schema>();
 
 /**
- * SSEチャット機能のオプション設定
+ * Options for the SSE chat hook
  */
 interface SSEChatOptions {
-  maxRetries?: number; // 最大再試行回数
-  retryDelay?: number; // 再試行間隔（ミリ秒）
+  maxRetries?: number; // maximum number of retries
+  retryDelay?: number; // retry interval (ms)
 }
 
 export interface Message {
@@ -79,15 +79,31 @@ export type AgentStatus =
   | null;
 
 /**
- * SSE（Server-Sent Events）を使用したチャット機能のカスタムフック
+ * Maps a raw error (often a verbose AWS SDK message) to a short, generic
+ * message safe to show in the chat UI. Full detail is only ever logged to
+ * the console, never rendered.
+ */
+function toFriendlyErrorMessage(rawMessage: string): string {
+  const lower = rawMessage.toLowerCase();
+  if (lower.includes("accessdenied") || lower.includes("not available for this account")) {
+    return "Error: The selected model isn't available right now. Try a different model, or try again later.";
+  }
+  if (lower.includes("throttl") || lower.includes("rate")) {
+    return "Error: Requests are being throttled. Please try again in a moment.";
+  }
+  return "Error: Failed to send message. Please try again in a moment.";
+}
+
+/**
+ * Custom hook for chat functionality backed by Server-Sent Events (SSE)
  *
- * @param options 設定オプション
- * @returns チャット機能のstate と関数
+ * @param options Configuration options
+ * @returns Chat state and functions
  */
 export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
   const { maxRetries = 3, retryDelay = 1000 } = options;
 
-  // State管理
+  // State
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,13 +178,13 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
     loadHistory();
   }, [sessionId]);
 
-  // 認証管理
+  // Auth
   const { getAuthTokens } = useAuth();
 
   /**
-   * メッセージを送信してAIからの応答を受信する
-   * @param prompt ユーザーからの入力プロンプト
-   * @param retryCount 現在の再試行回数（内部使用）
+   * Sends a message and receives the AI's response
+   * @param prompt The user's input prompt
+   * @param retryCount Current retry count (internal use)
    */
   const sendMessage = useCallback(
     async (prompt: string, retryCount = 0): Promise<void> => {
@@ -310,49 +326,56 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
                      const data = line.slice(6).trim();
                      if (data === "[DONE]") continue;
 
+                     let parsed;
                      try {
-                         const parsed = JSON.parse(data);
-                         
-                         if (parsed.error) throw new Error(parsed.error);
-
-                         const event = parsed.event;
-                         if (event?.messageStart) {
-                           // Model has started composing a turn, no tokens yet.
-                           setAgentStatus({ type: "thinking" });
-                         } else if (event?.contentBlockStart?.start?.toolUse) {
-                           // Model is about to call a tool.
-                           setAgentStatus({
-                             type: "tool_use",
-                             name: event.contentBlockStart.start.toolUse.name,
-                           });
-                         } else if (event?.messageStop) {
-                           setAgentStatus(null);
-                         }
-
-                         if (event?.contentBlockDelta?.delta) {
-                            const text = event.contentBlockDelta.delta.text;
-                            if (text) {
-                              // Actual answer text is streaming in, so we're
-                              // no longer "thinking" or mid-tool-call.
-                              setAgentStatus(null);
-                              aiResponseAccumulator += text;
-
-                              setMessages((prev) => {
-                                const newMessages = [...prev];
-                                const lastMessageIndex = newMessages.length - 1;
-                                const lastMessage = { ...newMessages[lastMessageIndex] };
-
-                                if (lastMessage.role === "assistant") {
-                                  lastMessage.content = aiResponseAccumulator;
-                                  newMessages[lastMessageIndex] = lastMessage;
-                                }
-                                return newMessages;
-                              });
-                            }
-                          }
+                         parsed = JSON.parse(data);
                      } catch (e) {
                          console.error("Error parsing SSE chunk", e);
+                         continue;
                      }
+
+                     // A backend/model error (e.g. AgentCore's underlying
+                     // Bedrock call failing) - surface it as a real error
+                     // instead of swallowing it, so the UI shows it and
+                     // cleans up the empty assistant bubble (see the outer
+                     // catch block below).
+                     if (parsed.error) throw new Error(parsed.error);
+
+                     const event = parsed.event;
+                     if (event?.messageStart) {
+                       // Model has started composing a turn, no tokens yet.
+                       setAgentStatus({ type: "thinking" });
+                     } else if (event?.contentBlockStart?.start?.toolUse) {
+                       // Model is about to call a tool.
+                       setAgentStatus({
+                         type: "tool_use",
+                         name: event.contentBlockStart.start.toolUse.name,
+                       });
+                     } else if (event?.messageStop) {
+                       setAgentStatus(null);
+                     }
+
+                     if (event?.contentBlockDelta?.delta) {
+                        const text = event.contentBlockDelta.delta.text;
+                        if (text) {
+                          // Actual answer text is streaming in, so we're
+                          // no longer "thinking" or mid-tool-call.
+                          setAgentStatus(null);
+                          aiResponseAccumulator += text;
+
+                          setMessages((prev) => {
+                            const newMessages = [...prev];
+                            const lastMessageIndex = newMessages.length - 1;
+                            const lastMessage = { ...newMessages[lastMessageIndex] };
+
+                            if (lastMessage.role === "assistant") {
+                              lastMessage.content = aiResponseAccumulator;
+                              newMessages[lastMessageIndex] = lastMessage;
+                            }
+                            return newMessages;
+                          });
+                        }
+                      }
                  }
             }
         }
@@ -371,19 +394,31 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
       } catch (fetchError) {
         const errorMessage =
           fetchError instanceof Error ? fetchError.message : "Unknown error";
+        // Full detail (AWS error text, stack, etc.) stays in the console for
+        // debugging; the UI only ever shows the short, friendly version.
         console.error("Invocation error:", fetchError);
         const isClientInitError =
           typeof errorMessage === "string" &&
           errorMessage.toLowerCase().includes("client initialization failed");
         const canRetry = retryCount < maxRetries && !isClientInitError;
 
-        // 自動再試行（指数バックオフ）
+        // Automatic retry (exponential backoff)
         if (canRetry) {
           setTimeout(() => {
             sendMessage(prompt, retryCount + 1);
           }, retryDelay * Math.pow(2, retryCount));
         } else {
-          setError(`通信エラー: ${errorMessage}`);
+          setError(toFriendlyErrorMessage(errorMessage));
+          // Drop the placeholder assistant bubble if nothing ever streamed
+          // into it, so a failed send doesn't leave an empty chat block
+          // behind - the error banner below already explains what happened.
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last && last.role === "assistant" && last.content === "") {
+              return prev.slice(0, -1);
+            }
+            return prev;
+          });
         }
       } finally {
         setIsLoading(false);
@@ -394,7 +429,7 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
   );
 
   /**
-   * メッセージ履歴をクリアする
+   * Clears the message history
    */
   const clearMessages = useCallback(() => {
     setMessages([]);
@@ -402,7 +437,7 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
   }, []);
 
   /**
-   * AIの応答にフィードバックを送信する
+   * Submits feedback on an AI response
    */
   const submitFeedback = useCallback(
     async (messageId: string, feedback: "good" | "bad") => {
@@ -426,16 +461,16 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
   );
 
   return {
-    messages, // メッセージ履歴
-    isLoading, // 送信中フラグ
-    error, // エラーメッセージ
-    agentStatus, // "thinking" / "using tool X" ライブステータス
-    selectedTools, // 有効なツールのid一覧
-    setSelectedTools, // ツール選択を更新する関数
-    selectedModel, // 選択中のモデルid
-    setSelectedModel, // モデル選択を更新する関数
-    sendMessage, // メッセージ送信関数
-    clearMessages, // 履歴クリア関数
-    submitFeedback, // フィードバック送信関数
+    messages, // message history
+    isLoading, // whether a send is in progress
+    error, // error message
+    agentStatus, // "thinking" / "using tool X" live status
+    selectedTools, // enabled tool ids
+    setSelectedTools, // updates the selected tools
+    selectedModel, // selected model id
+    setSelectedModel, // updates the selected model
+    sendMessage, // sends a message
+    clearMessages, // clears the history
+    submitFeedback, // submits feedback
   };
 }

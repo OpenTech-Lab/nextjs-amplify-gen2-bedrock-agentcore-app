@@ -285,10 +285,10 @@ export default function ChatComponent({ sessionId }: ChatComponentProps) {
                       {message.role === "user" ? "You" : "AI Assistant"}
                     </div>
                     <div
-                      className={`inline-block max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 ${
+                      className={`inline-block max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 ${
                         message.role === "user"
-                          ? "bg-gradient-to-br from-blue-600 to-blue-500 text-white text-left"
-                          : "bg-muted/50 border border-border/50"
+                          ? "py-2 bg-gradient-to-br from-blue-600 to-blue-500 text-white text-left"
+                          : "py-3 bg-muted/50 border border-border/50"
                       }`}
                     >
                       <div

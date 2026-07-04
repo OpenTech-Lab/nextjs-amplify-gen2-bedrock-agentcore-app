@@ -50,7 +50,7 @@ export default function Header() {
               className="gap-2"
             >
               <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">ログアウト</span>
+              <span className="hidden sm:inline">Sign out</span>
             </Button>
           </div>
         </div>
