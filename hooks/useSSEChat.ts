@@ -36,6 +36,12 @@ export const AVAILABLE_TOOLS = [
       "Query AWS's broader knowledge base: What's New posts, blog posts, architecture guidance, and regional/API availability.",
   },
   {
+    id: "knowledge_base",
+    label: "Knowledge Base",
+    description:
+      "Search your own uploaded documents (stored in S3, indexed via Amazon Bedrock Knowledge Bases) for relevant context.",
+  },
+  {
     id: "calculator",
     label: "Calculator",
     description: "Evaluate mathematical expressions precisely instead of guessing.",

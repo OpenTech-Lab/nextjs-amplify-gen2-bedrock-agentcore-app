@@ -1,3 +1,4 @@
+import os
 import sys
 from contextlib import ExitStack
 from datetime import datetime, timezone
@@ -8,7 +9,14 @@ from mcp.client.streamable_http import streamablehttp_client
 from strands import Agent
 from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
-from strands_tools import calculator, current_time, http_request
+from strands_tools import calculator, current_time, http_request, retrieve
+
+# Bedrock Knowledge Base for document research (S3 Vectors-backed - see
+# mcpagentgen2-kb-docs-832780067678 / mcpagentgen2-kb-vectors). Upload
+# documents to that S3 bucket and re-sync the data source to make them
+# searchable. strands_tools.retrieve reads these as its defaults.
+os.environ.setdefault("KNOWLEDGE_BASE_ID", "WIASIAEP4H")
+os.environ.setdefault("AWS_REGION", "ap-northeast-1")
 
 # Models the frontend can pick from (see AVAILABLE_MODELS in hooks/useSSEChat.ts).
 # Values are Bedrock model/inference-profile IDs.
@@ -24,14 +32,22 @@ DEFAULT_MODEL_ID = "sonnet-4-6"
 app = BedrockAgentCoreApp()
 
 SYSTEM_PROMPT = """
-You are an agentic AWS assistant. You have tools to search official AWS
-documentation, query the broader AWS Knowledge base (What's New posts,
-blogs, architectural guidance, regional availability), fetch web pages, do
+You are a general-purpose agentic research assistant. You have tools to
+search official AWS documentation, query the broader AWS Knowledge base
+(What's New posts, blogs, architectural guidance, regional availability),
+search the user's own document knowledge base, fetch web pages, do
 calculations, and check the current time.
 
-Prefer using a tool over guessing whenever the question involves AWS services,
-APIs, current events, or anything you are not certain about. When you use the
-AWS documentation/knowledge tools, cite which page(s) you used.
+Answer any question you have the knowledge or tools to address, not just AWS
+topics. Prefer using a tool over guessing whenever the question involves
+current events, the user's own documents, AWS services/APIs, or anything you
+are not certain about. For AWS-specific questions, prefer the AWS
+documentation/knowledge tools over the web and cite which page(s) you used.
+For general research questions, use web search/fetch as needed. When you use
+the knowledge base tool, cite the source document(s) it returned.
+
+Write as a professional expert: precise, direct, and free of emoji or casual
+decoration. Do not use emoji anywhere in your responses.
 
 Provide concise answers with only the relevant information.
 """
@@ -79,6 +95,7 @@ _tool_registry: dict[str, list] = {}
 TOOL_IDS = [
     "aws_documentation",
     "aws_knowledge",
+    "knowledge_base",
     "calculator",
     "current_time",
     "http_request",
@@ -95,6 +112,7 @@ def _get_tool_registry() -> dict[str, list]:
         _exit_stack.enter_context(_aws_knowledge_mcp_client)
         _tool_registry["aws_knowledge"] = _aws_knowledge_mcp_client.list_tools_sync()
 
+        _tool_registry["knowledge_base"] = [retrieve]
         _tool_registry["calculator"] = [calculator]
         _tool_registry["current_time"] = [current_time]
         _tool_registry["http_request"] = [http_request]
