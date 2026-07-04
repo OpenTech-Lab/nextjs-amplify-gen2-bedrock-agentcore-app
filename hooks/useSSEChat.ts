@@ -3,16 +3,8 @@ import { useAuth } from "./useAuth";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "@/amplify/data/resource";
-import {
-  BedrockAgentCoreClient,
-  InvokeAgentRuntimeCommand,
-} from "@aws-sdk/client-bedrock-agentcore";
 
 const client = generateClient<Schema>();
-
-// AgentCore runtime ARN
-const CLIENT_AGENT_ARN = process.env.NEXT_PUBLIC_AGENT_ARN;
-const AWS_REGION = process.env.NEXT_PUBLIC_AWS_REGION || "ap-northeast-1";
 
 /**
  * SSEチャット機能のオプション設定
@@ -65,15 +57,10 @@ export type ToolId = (typeof AVAILABLE_TOOLS)[number]["id"];
 /** Model ids the backend agent (agentcore/mcpAgentGen2/app/main.py) knows how to switch to. */
 export const AVAILABLE_MODELS = [
   {
-    id: "sonnet-4-5",
-    label: "Claude Sonnet 4.5",
-    description: "Current default. Balanced speed, cost, and intelligence.",
-  },
-  {
     id: "sonnet-5",
     label: "Claude Sonnet 5",
     description:
-      "Anthropic's newest Sonnet — near-Opus intelligence for coding and agentic work at Sonnet pricing.",
+      "Current default. Anthropic's newest Sonnet — near-Opus intelligence for coding and agentic work at Sonnet pricing.",
   },
   {
     id: "haiku-4-5",
@@ -83,7 +70,7 @@ export const AVAILABLE_MODELS = [
 ] as const;
 
 export type ModelId = (typeof AVAILABLE_MODELS)[number]["id"];
-const DEFAULT_MODEL_ID: ModelId = "sonnet-4-5";
+const DEFAULT_MODEL_ID: ModelId = "sonnet-5";
 
 /** Live status of the agent while a response is streaming in. */
 export type AgentStatus =
@@ -248,108 +235,73 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
         }
       }
 
-      console.log("Sending request to AgentCore via SDK...");
+      console.log("Sending request to AgentCore via server-side proxy...");
 
       try {
-        if (!CLIENT_AGENT_ARN) {
-            throw new Error("NEXT_PUBLIC_AGENT_ARN environment variable is not defined");
-        }
+        const inputText = messages.length > 0
+            ? `${messages.map(m => `${m.role}: ${m.content}`).join("\n")}\nuser: ${prompt}`
+            : prompt;
 
-        // Fetch current credentials
+        // The actual bedrock-agentcore:InvokeAgentRuntime call happens in
+        // app/api/invocations/route.ts, using the Amplify SSR Compute role's
+        // credentials. Calling it directly from the browser with Cognito
+        // Identity Pool credentials (fetchAuthSession) doesn't work: that
+        // flow always attaches an AWS-managed default session policy the
+        // caller can't override, which doesn't grant bedrock-agentcore
+        // actions regardless of the identity-based IAM policy.
+        //
+        // That route still needs to verify the caller before invoking
+        // anything (otherwise it's an open, unauthenticated proxy) - it does
+        // so by validating these Cognito Identity Pool credentials via STS,
+        // which is why they're forwarded here even though they can't be used
+        // to call bedrock-agentcore themselves. The runtime session id is
+        // derived server-side from the verified identity, not sent by us.
         const session = await fetchAuthSession();
         const creds = session.credentials;
-
-        if (!creds) {
+        if (!creds || !session.identityId) {
             throw new Error("Failed to get AWS credentials");
         }
 
-        const agentCoreClient = new BedrockAgentCoreClient({
-            region: AWS_REGION,
-            credentials: creds,
+        const response = await fetch("/api/invocations", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-access-key-id": creds.accessKeyId,
+                "x-secret-access-key": creds.secretAccessKey,
+                "x-session-token": creds.sessionToken ?? "",
+                "x-identity-id": session.identityId,
+            },
+            body: JSON.stringify({
+                prompt: inputText,
+                tools: selectedTools,
+                model: selectedModel,
+            }),
         });
 
-        const inputText = messages.length > 0 
-            ? `${messages.map(m => `${m.role}: ${m.content}`).join("\n")}\nuser: ${prompt}` 
-            : prompt;
-
-        // Generate session ID (must be >= 33 chars) - use the chat session Id if possible or generate one for runtime?
-        // Runtime requires session ID to persist context.
-        // We can reuse sessionId passed to the hook, but it needs to be formatted?
-        // AgentCore runtime session ID requirements might differ. 
-        // Let's generate one per turn or use persistent one? 
-        // Python code uses random generation. Let's use sessionId if it fits.
-        // But sessionId from hook might be UUID from somewhere else.
-        // Let's create a runtime session ID that persists for the *hook* lifecycle or derive it.
-        // For now, let's keep it simple and generate one per request like previous route (stateless HTTP), 
-        // BUT wait, route.ts was "stateless" per HTTP request but agentcore runtime *has* state?
-        // The previous python agent implementation: "agent_stream = current_agent.stream_async(user_prompt)" 
-        // And strands.Helper likely manages history if session ID is provided.
-        // The previous route.ts generated a NEW runtimeSessionId for EACH request:
-        /*
-        const runtimeSessionId = `session-${Date.now()}-${Math.random()
-          .toString(36)
-          .substring(2, 15)}-${Math.random().toString(36).substring(2, 15)}`;
-        */
-       // So it was effectively stateless? Or AgentCore preserves it?
-       // If we want conversation history, we should probably keep the session ID consistent?
-       // But let's replicate the route.ts behavior first.
-        const runtimeSessionId = `session-${Date.now()}-${Math.random()
-            .toString(36)
-            .substring(2, 15)}-${Math.random().toString(36).substring(2, 15)}`;
-
-        const payload = JSON.stringify({
-            prompt: inputText,
-            tools: selectedTools,
-            model: selectedModel,
-        });
-
-        const command = new InvokeAgentRuntimeCommand({
-            agentRuntimeArn: CLIENT_AGENT_ARN,
-            runtimeSessionId,
-            payload: new TextEncoder().encode(payload),
-            contentType: "application/json",
-            accept: "application/json",
-        });
-
-        const response = await agentCoreClient.send(command);
-        console.log("AgentCore response received");
-
-        // Handle SSE streaming response from AgentCore
-        // response.response is the stream
-        const outputStream = response.response;
-        if (!outputStream) {
-             throw new Error("No output stream found in response");
+        if (!response.ok || !response.body) {
+            const errorBody = await response.text().catch(() => "");
+            throw new Error(errorBody || `Request failed with status ${response.status}`);
         }
+        console.log("AgentCore response received");
 
         let aiResponseAccumulator = "";
         const decoder = new TextDecoder();
 
-        // Type assertion to iterate over the async iterable
-        const asyncIterable = outputStream as AsyncIterable<Uint8Array>;
-        for await (const chunk of asyncIterable) {
+        const reader = response.body.getReader();
+        for (;;) {
+            const { done, value: chunk } = await reader.read();
+            if (done) break;
             let chunkStr = "";
             if (chunk instanceof Uint8Array) {
                 chunkStr = decoder.decode(chunk);
             } else if (typeof chunk === "string") {
                 chunkStr = chunk;
             } else {
-                 chunkStr = JSON.stringify(chunk); // Should not happen for configured SDK
+                 chunkStr = JSON.stringify(chunk); // Should not happen for a Response body stream
             }
-            
-            // The chunk from SDK might NOT be "data: ..." formatted strings if using SDK?
-            // Wait, previous route.ts was manually decoding chunks and ENQUEUEING them to SSE controller.
-            // But what does SDK return as payload? 
-            // The "response" field in InvokeAgentRuntimeCommandOutput is: "response?: AsyncIterable<Uint8Array> | undefined"
-            // The underlying service returns an Event Stream or just a stream of bytes?
-            // In route.ts: "chunkStr = decoder.decode(chunk);" and then log it. 
-            // The route.ts was then wrapping it in `controller.enqueue(...)` effectively passing it through.
-            // The output from AgentCore Runtime IS ALREADY SSE-formatted text?
-            // "data: {"event": ...}"
-            
-            // Yes, checking current logs: 
-            // "data: {"event": {"messageStart": ...}}"
-            // So we need to parse this SSE format manually here too.
 
+            // The proxy route passes through AgentCore's raw SSE bytes
+            // ("data: {\"event\": {...}}"), so we parse that format here.
             const lines = chunkStr.split("\n");
             for (const line of lines) {
                  if (!line || !line.trim()) continue;

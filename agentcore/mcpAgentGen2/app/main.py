@@ -13,11 +13,10 @@ from strands_tools import calculator, current_time, http_request
 # Values are Bedrock model/inference-profile IDs. Claude Sonnet 5 has no `jp.`
 # geo cross-region profile yet, so it uses the `global.` profile instead.
 AVAILABLE_MODELS = {
-    "sonnet-4-5": "jp.anthropic.claude-sonnet-4-5-20250929-v1:0",
     "sonnet-5": "global.anthropic.claude-sonnet-5",
     "haiku-4-5": "jp.anthropic.claude-haiku-4-5-20251001-v1:0",
 }
-DEFAULT_MODEL_ID = "sonnet-4-5"
+DEFAULT_MODEL_ID = "sonnet-5"
 
 app = BedrockAgentCoreApp()
 
