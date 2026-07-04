@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, Loader2 } from "lucide-react";
+import { ExternalLink, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -35,7 +35,10 @@ export default function KnowledgeBaseButton() {
   const [files, setFiles] = useState<KnowledgeBaseFile[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [openingKey, setOpeningKey] = useState<string | null>(null);
+  const [loadingKey, setLoadingKey] = useState<string | null>(null);
+  // Presigned URLs are fetched on first click and kept here so the second
+  // click can be a real <a target="_blank"> navigation (see below for why).
+  const [fileUrls, setFileUrls] = useState<Record<string, string>>({});
 
   const loadFiles = async () => {
     if (files || isLoading) return; // cache within this mount; reopen refetches only if empty/errored
@@ -54,14 +57,19 @@ export default function KnowledgeBaseButton() {
     }
   };
 
-  const openFile = async (key: string) => {
-    setOpeningKey(key);
-    // Open the tab synchronously, as a direct result of the click, so
-    // browsers (Safari especially) don't treat it as a blocked popup - if
-    // this happened after the awaits below instead, it would no longer
-    // count as a direct user-gesture response. We navigate this tab once
-    // the presigned URL comes back.
-    const newTab = window.open("", "_blank", "noopener,noreferrer");
+  // Presigned URLs expire in 5 minutes; drop any fetched ones once the menu
+  // closes so reopening later always fetches a fresh link.
+  const handleOpenChange = (open: boolean) => {
+    if (open) {
+      loadFiles();
+    } else {
+      setFileUrls({});
+    }
+  };
+
+  const fetchFileUrl = async (key: string) => {
+    setLoadingKey(key);
+    setError(null);
     try {
       const headers = await authHeaders();
       const response = await fetch(
@@ -70,21 +78,16 @@ export default function KnowledgeBaseButton() {
       );
       if (!response.ok) throw new Error(`Request failed with status ${response.status}`);
       const data = await response.json();
-      if (newTab) {
-        newTab.location.href = data.url;
-      } else {
-        setError("Pop-up blocked - please allow pop-ups for this site.");
-      }
+      setFileUrls((prev) => ({ ...prev, [key]: data.url }));
     } catch (err) {
-      newTab?.close();
       setError(err instanceof Error ? err.message : "Failed to open file.");
     } finally {
-      setOpeningKey(null);
+      setLoadingKey(null);
     }
   };
 
   return (
-    <DropdownMenu onOpenChange={(open) => open && loadFiles()}>
+    <DropdownMenu onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs rounded-full">
           <FileText className="w-3.5 h-3.5" />
@@ -105,31 +108,49 @@ export default function KnowledgeBaseButton() {
           <p className="px-2 py-1.5 text-xs text-muted-foreground">No documents uploaded yet.</p>
         )}
         <TooltipProvider delayDuration={200}>
-          {files?.map((file) => (
-            <Tooltip key={file.key}>
-              <TooltipTrigger asChild>
-                <DropdownMenuItem
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    openFile(file.key);
-                  }}
-                  className="flex items-center justify-between gap-2"
-                >
-                  <span className="truncate">{file.key}</span>
-                  <span className="flex-shrink-0 text-xs text-muted-foreground">
-                    {openingKey === file.key ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      formatSize(file.size)
-                    )}
-                  </span>
+          {files?.map((file) => {
+            const url = fileUrls[file.key];
+            // Once we have a presigned URL, render a real <a target="_blank">
+            // so the second click is a genuine link navigation - immune to
+            // popup blockers, unlike a script-triggered window.open() (which
+            // browsers can block even when called synchronously from a
+            // click, depending on how the menu library dispatches onSelect).
+            if (url) {
+              return (
+                <DropdownMenuItem key={file.key} asChild className="flex items-center justify-between gap-2">
+                  <a href={url} target="_blank" rel="noopener noreferrer">
+                    <span className="truncate">{file.key}</span>
+                    <ExternalLink className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
+                  </a>
                 </DropdownMenuItem>
-              </TooltipTrigger>
-              <TooltipContent side="left" className="max-w-[280px] break-all text-xs">
-                {file.key}
-              </TooltipContent>
-            </Tooltip>
-          ))}
+              );
+            }
+            return (
+              <Tooltip key={file.key}>
+                <TooltipTrigger asChild>
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      fetchFileUrl(file.key);
+                    }}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <span className="truncate">{file.key}</span>
+                    <span className="flex-shrink-0 text-xs text-muted-foreground">
+                      {loadingKey === file.key ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        formatSize(file.size)
+                      )}
+                    </span>
+                  </DropdownMenuItem>
+                </TooltipTrigger>
+                <TooltipContent side="left" className="max-w-[280px] break-all text-xs">
+                  {file.key}
+                </TooltipContent>
+              </Tooltip>
+            );
+          })}
         </TooltipProvider>
       </DropdownMenuContent>
     </DropdownMenu>
