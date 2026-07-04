@@ -52,6 +52,7 @@ export default function LoginForm() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
@@ -59,6 +60,7 @@ export default function LoginForm() {
     setView(next);
     setMessage(null);
     setPassword("");
+    setConfirmPassword("");
     setCode("");
     setNewPassword("");
   };
@@ -85,8 +87,14 @@ export default function LoginForm() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setMessage(null);
+
+    if (password !== confirmPassword) {
+      setMessage({ type: "error", text: "Passwords don't match." });
+      return;
+    }
+
+    setIsLoading(true);
     try {
       const { nextStep } = await signUp({
         username: email,
@@ -268,6 +276,18 @@ export default function LoginForm() {
                 onChange={(e) => setPassword(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">At least 8 characters.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="signup-confirm-password">Confirm password</Label>
+              <Input
+                id="signup-confirm-password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="new-password"
+                required
+                minLength={8}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
             </div>
             <Button type="submit" disabled={isLoading} className="w-full">
               {isLoading ? <Spinner className="w-4 h-4" /> : "Create account"}
