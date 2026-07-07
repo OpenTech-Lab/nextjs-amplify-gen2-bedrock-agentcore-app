@@ -3,8 +3,16 @@ import { useAuth } from "./useAuth";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "@/amplify/data/resource";
+import outputs from "@/amplify_outputs.json";
 
 const client = generateClient<Schema>();
+
+// The AgentCore invocation runs in a standalone Lambda (Function URL, not a
+// Next.js API route) because Amplify Hosting's Next.js SSR compute has a
+// hard ~30s response timeout that AgentCore tool-use calls can exceed - see
+// amplify/functions/invocations/handler.ts.
+const INVOCATIONS_URL = (outputs as { custom?: { invocationsFunctionUrl?: string } })
+  .custom?.invocationsFunctionUrl;
 
 /**
  * Options for the SSE chat hook
@@ -124,9 +132,16 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
   // Session ID Management (Handled externally now)
   // const [sessionId] = useState(...) -> Removed
 
+  // Auth
+  const { getAuthTokens, isAuthenticated } = useAuth();
+
   // Load history on mount
   useEffect(() => {
-    if (!sessionId) return;
+    // Guests have no Cognito User Pool identity, and Message/ChatSession are
+    // owner-scoped (amplify/data/resource.ts) - there's nothing to load, and
+    // calling the Data API as a guest would just throw
+    // "NoValidAuthTokens: No federated jwt".
+    if (!sessionId || !isAuthenticated) return;
 
     // Define the type for the API response items
     interface MessageRecord {
@@ -181,10 +196,7 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
     };
 
     loadHistory();
-  }, [sessionId]);
-
-  // Auth
-  const { getAuthTokens } = useAuth();
+  }, [sessionId, isAuthenticated]);
 
   /**
    * Sends a message and receives the AI's response
@@ -210,49 +222,56 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
 
       let savedMessageId: string | undefined;
 
-      // Create message record with user input
-      try {
-        const { data: newMessage } = await client.models.Message.create({
-          userMessage: prompt,
-          aiResponse: "", // Initialize with empty string or null
-          sessionId,
-        });
-        savedMessageId = newMessage?.id;
-
-        // Update state with the backend ID for the AI message (we'll attach it to the pair)
-        // Here we associate the ID with the assistant message so we can update it later
-        if (savedMessageId) {
-          setMessages((prev) => {
-            const newMessages = [...prev];
-            const lastMessageIndex = newMessages.length - 1;
-            // Associate ID with the assistant message so users can rate the RESPONSE
-            newMessages[lastMessageIndex] = {
-              ...newMessages[lastMessageIndex],
-              id: savedMessageId,
-            };
-            return newMessages;
-          });
-        }
-      } catch (e) {
-        console.error("Failed to save user message:", e);
-      }
-
-      // Create or update ChatSession
-      if (messages.length === 0) {
+      // Message/ChatSession are owner-scoped (amplify/data/resource.ts) to
+      // signed-in Cognito User Pool users. Guests have no User Pool identity
+      // to own records with, so their chats are ephemeral (in-memory only,
+      // never persisted) rather than granting guests broad, unscoped table
+      // access just to work around that.
+      if (isAuthenticated) {
+        // Create message record with user input
         try {
-          // Check if session exists first (to avoid duplicates if re-rendering)
-          const { data: sessions } = await client.models.ChatSession.list({
-            filter: { sessionId: { eq: sessionId } },
+          const { data: newMessage } = await client.models.Message.create({
+            userMessage: prompt,
+            aiResponse: "", // Initialize with empty string or null
+            sessionId,
           });
+          savedMessageId = newMessage?.id;
 
-          if (sessions.length === 0) {
-            await client.models.ChatSession.create({
-              sessionId,
-              name: prompt.slice(0, 50) + (prompt.length > 50 ? "..." : ""),
+          // Update state with the backend ID for the AI message (we'll attach it to the pair)
+          // Here we associate the ID with the assistant message so we can update it later
+          if (savedMessageId) {
+            setMessages((prev) => {
+              const newMessages = [...prev];
+              const lastMessageIndex = newMessages.length - 1;
+              // Associate ID with the assistant message so users can rate the RESPONSE
+              newMessages[lastMessageIndex] = {
+                ...newMessages[lastMessageIndex],
+                id: savedMessageId,
+              };
+              return newMessages;
             });
           }
         } catch (e) {
-          console.error("Failed to create chat session:", e);
+          console.error("Failed to save user message:", e);
+        }
+
+        // Create or update ChatSession
+        if (messages.length === 0) {
+          try {
+            // Check if session exists first (to avoid duplicates if re-rendering)
+            const { data: sessions } = await client.models.ChatSession.list({
+              filter: { sessionId: { eq: sessionId } },
+            });
+
+            if (sessions.length === 0) {
+              await client.models.ChatSession.create({
+                sessionId,
+                name: prompt.slice(0, 50) + (prompt.length > 50 ? "..." : ""),
+              });
+            }
+          } catch (e) {
+            console.error("Failed to create chat session:", e);
+          }
         }
       }
 
@@ -264,14 +283,15 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
             : prompt;
 
         // The actual bedrock-agentcore:InvokeAgentRuntime call happens in
-        // app/api/invocations/route.ts, using the Amplify SSR Compute role's
-        // credentials. Calling it directly from the browser with Cognito
-        // Identity Pool credentials (fetchAuthSession) doesn't work: that
-        // flow always attaches an AWS-managed default session policy the
-        // caller can't override, which doesn't grant bedrock-agentcore
-        // actions regardless of the identity-based IAM policy.
+        // amplify/functions/invocations/handler.ts, using that function's own
+        // execution role's credentials. Calling it directly from the browser
+        // with Cognito Identity Pool credentials (fetchAuthSession) doesn't
+        // work: that flow always attaches an AWS-managed default session
+        // policy the caller can't override, which doesn't grant
+        // bedrock-agentcore actions regardless of the identity-based IAM
+        // policy.
         //
-        // That route still needs to verify the caller before invoking
+        // The function still needs to verify the caller before invoking
         // anything (otherwise it's an open, unauthenticated proxy) - it does
         // so by validating these Cognito Identity Pool credentials via STS,
         // which is why they're forwarded here even though they can't be used
@@ -283,7 +303,11 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
             throw new Error("Failed to get AWS credentials");
         }
 
-        const response = await fetch("/api/invocations", {
+        if (!INVOCATIONS_URL) {
+            throw new Error("Invocations function URL is not configured");
+        }
+
+        const response = await fetch(INVOCATIONS_URL, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -430,7 +454,7 @@ export function useSSEChat(sessionId: string, options: SSEChatOptions = {}) {
         setAgentStatus(null);
       }
     },
-    [maxRetries, retryDelay, sessionId, messages, selectedTools, selectedModel] // Removed getAuthTokens as we use fetchAuthSession
+    [maxRetries, retryDelay, sessionId, messages, selectedTools, selectedModel, isAuthenticated] // Removed getAuthTokens as we use fetchAuthSession
   );
 
   /**
